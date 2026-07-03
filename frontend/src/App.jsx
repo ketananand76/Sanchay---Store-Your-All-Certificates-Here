@@ -22,6 +22,12 @@ import Register from './pages/Register';
 import UserLogin from './pages/UserLogin';
 import UserDashboard from './pages/UserDashboard';
 
+// Social network pages
+import Settings from './pages/Settings';
+import UserProfile from './pages/UserProfile';
+import UserSearch from './pages/UserSearch';
+import Chat from './pages/Chat';
+
 // Initialize React Query Client
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -119,6 +125,40 @@ export default function App() {
               element={
                 <AppLayout>
                   <UserDashboard />
+                </AppLayout>
+              }
+            />
+
+            {/* Social Network Routes */}
+            <Route
+              path="/profile/:id"
+              element={
+                <AppLayout>
+                  <UserProfile />
+                </AppLayout>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <AppLayout>
+                  <Settings />
+                </AppLayout>
+              }
+            />
+            <Route
+              path="/search"
+              element={
+                <AppLayout>
+                  <UserSearch />
+                </AppLayout>
+              }
+            />
+            <Route
+              path="/chat"
+              element={
+                <AppLayout>
+                  <Chat />
                 </AppLayout>
               }
             />

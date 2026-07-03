@@ -1,0 +1,326 @@
+const User = require('../models/User');
+const Certificate = require('../models/Certificate');
+const bcrypt = require('bcryptjs');
+const { uploadToCloudinary } = require('../config/cloudinary');
+
+// POST /api/social/follow/:id
+const toggleFollow = async (req, res, next) => {
+  try {
+    const targetUserId = req.params.id;
+    const currentUserId = req.user.id;
+
+    if (String(targetUserId) === String(currentUserId)) {
+      res.status(400);
+      throw new Error('You cannot follow yourself');
+    }
+
+    const targetUser = await User.findById(targetUserId);
+    const currentUser = await User.findById(currentUserId);
+
+    if (!targetUser || !currentUser) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+
+    const isFollowing = currentUser.following.includes(targetUserId);
+
+    if (isFollowing) {
+      // Unfollow
+      currentUser.following = currentUser.following.filter(id => String(id) !== String(targetUserId));
+      targetUser.followers = targetUser.followers.filter(id => String(id) !== String(currentUserId));
+    } else {
+      // Follow
+      currentUser.following.push(targetUserId);
+      targetUser.followers.push(currentUserId);
+    }
+
+    await currentUser.save();
+    await targetUser.save();
+
+    res.status(200).json({
+      success: true,
+      isFollowing: !isFollowing,
+      message: isFollowing ? 'Unfollowed successfully' : 'Followed successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET /api/social/search
+const searchUsers = async (req, res, next) => {
+  try {
+    const { q } = req.query;
+    if (!q) {
+      return res.status(200).json({ success: true, users: [] });
+    }
+
+    const users = await User.find({
+      $and: [
+        { _id: { $ne: req.user.id } },
+        {
+          $or: [
+            { name: { $regex: q, $options: 'i' } },
+            { email: { $regex: q, $options: 'i' } },
+          ],
+        },
+      ],
+    })
+      .select('name email profilePicture bio followers following')
+      .limit(20);
+
+    res.status(200).json({
+      success: true,
+      users,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/social/like/:id
+const toggleLikeCertificate = async (req, res, next) => {
+  try {
+    const certId = req.params.id;
+    const userId = req.user.id;
+
+    const certificate = await Certificate.findById(certId);
+    if (!certificate) {
+      res.status(404);
+      throw new Error('Certificate not found');
+    }
+
+    const isLiked = certificate.likes.includes(userId);
+
+    if (isLiked) {
+      // Unlike
+      certificate.likes = certificate.likes.filter(id => String(id) !== String(userId));
+    } else {
+      // Like
+      certificate.likes.push(userId);
+    }
+
+    await certificate.save();
+
+    res.status(200).json({
+      success: true,
+      isLiked: !isLiked,
+      likesCount: certificate.likes.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/social/comment/:id
+const addComment = async (req, res, next) => {
+  try {
+    const certId = req.params.id;
+    const userId = req.user.id;
+    const { text } = req.body;
+
+    if (!text || !text.trim()) {
+      res.status(400);
+      throw new Error('Comment text is required');
+    }
+
+    const certificate = await Certificate.findById(certId);
+    if (!certificate) {
+      res.status(404);
+      throw new Error('Certificate not found');
+    }
+
+    const user = await User.findById(userId);
+
+    const newComment = {
+      user: userId,
+      userName: user.name,
+      userProfilePicture: user.profilePicture || '',
+      text: text.trim(),
+      createdAt: new Date(),
+    };
+
+    certificate.comments.push(newComment);
+    await certificate.save();
+
+    res.status(201).json({
+      success: true,
+      comment: certificate.comments[certificate.comments.length - 1],
+      comments: certificate.comments,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// DELETE /api/social/comment/:certId/:commentId
+const deleteComment = async (req, res, next) => {
+  try {
+    const { certId, commentId } = req.params;
+    const userId = req.user.id;
+
+    const certificate = await Certificate.findById(certId);
+    if (!certificate) {
+      res.status(404);
+      throw new Error('Certificate not found');
+    }
+
+    const comment = certificate.comments.id(commentId);
+    if (!comment) {
+      res.status(404);
+      throw new Error('Comment not found');
+    }
+
+    // Allow deletion if requester is comment author OR certificate owner
+    if (String(comment.user) !== String(userId) && String(certificate.uploadedBy) !== String(userId)) {
+      res.status(403);
+      throw new Error('Not authorized to delete this comment');
+    }
+
+    certificate.comments = certificate.comments.filter(c => String(c._id) !== String(commentId));
+    await certificate.save();
+
+    res.status(200).json({
+      success: true,
+      comments: certificate.comments,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// PUT /api/social/profile
+const updateAdvancedProfile = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { name, bio, gender, privateAccount, website, github, linkedin, skills, password } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+
+    // Photo upload handling (Cloudinary)
+    if (req.file) {
+      const cloudinaryResult = await uploadToCloudinary(req.file.path);
+      if (cloudinaryResult) {
+        user.profilePicture = cloudinaryResult.url;
+      } else {
+        user.profilePicture = `/uploads/${req.file.filename}`;
+      }
+    }
+
+    // Name & basic settings
+    user.name = name !== undefined ? name : user.name;
+    user.bio = bio !== undefined ? bio : user.bio;
+    user.gender = gender !== undefined ? gender : user.gender;
+    user.privateAccount = privateAccount !== undefined ? privateAccount === 'true' || privateAccount === true : user.privateAccount;
+
+    // Links update
+    if (user.links) {
+      user.links.website = website !== undefined ? website : user.links.website;
+      user.links.github = github !== undefined ? github : user.links.github;
+      user.links.linkedin = linkedin !== undefined ? linkedin : user.links.linkedin;
+    } else {
+      user.links = {
+        website: website || '',
+        github: github || '',
+        linkedin: linkedin || '',
+      };
+    }
+
+    // Skills array update
+    if (skills !== undefined) {
+      user.skills = Array.isArray(skills) ? skills : JSON.parse(skills || '[]');
+    }
+
+    // Password change
+    if (password && password.trim()) {
+      const salt = await bcrypt.genSalt(12);
+      user.passwordHash = await bcrypt.hash(password, salt);
+    }
+
+    const updatedUser = await user.save();
+
+    res.status(200).json({
+      success: true,
+      user: {
+        _id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        bio: updatedUser.bio,
+        profilePicture: updatedUser.profilePicture,
+        gender: updatedUser.gender,
+        privateAccount: updatedUser.privateAccount,
+        links: updatedUser.links,
+        skills: updatedUser.skills,
+        followers: updatedUser.followers,
+        following: updatedUser.following,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// DELETE /api/social/profile (Delete account)
+const deleteAccount = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    // Delete user's certificates
+    await Certificate.deleteMany({ uploadedBy: userId });
+
+    // Delete the user document
+    await User.findByIdAndDelete(userId);
+
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    }).status(200).json({
+      success: true,
+      message: 'Account and associated certificates deleted successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getAllUsers = async (req, res, next) => {
+  try {
+    const query = req.user ? { _id: { $ne: req.user.id } } : {};
+    const users = await User.find(query).select('name email profilePicture bio followers following').sort({ name: 1 });
+    res.status(200).json({ success: true, users });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getUserProfile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id).select('-passwordHash');
+    if (!user) {
+      res.status(404);
+      throw new Error('User profile not found');
+    }
+    const certificates = await Certificate.find({ uploadedBy: user._id }).sort({ order: 1, dateIssued: -1 });
+    res.status(200).json({ success: true, user, certificates });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = {
+  toggleFollow,
+  searchUsers,
+  toggleLikeCertificate,
+  addComment,
+  deleteComment,
+  updateAdvancedProfile,
+  deleteAccount,
+  getAllUsers,
+  getUserProfile,
+};

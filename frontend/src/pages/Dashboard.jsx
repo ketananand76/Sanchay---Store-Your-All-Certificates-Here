@@ -336,8 +336,9 @@ export default function Dashboard() {
                     <tr className="bg-purple-950/20 border-b border-purple-950/50 text-gray-400 uppercase text-[10px] font-bold tracking-widest">
                       <th className="px-6 py-4">Name</th>
                       <th className="px-6 py-4">Email</th>
-                      <th className="px-6 py-4">Registered Date</th>
-                      <th className="px-6 py-4 text-center">Certificates</th>
+                      <th className="px-6 py-4">Followers</th>
+                      <th className="px-6 py-4">Following</th>
+                      <th className="px-6 py-4 text-center">Posts (Certs)</th>
                       <th className="px-6 py-4 text-right">Details</th>
                     </tr>
                   </thead>
@@ -345,15 +346,14 @@ export default function Dashboard() {
                     {monitorData.users.map((u) => (
                       <React.Fragment key={u._id}>
                         <tr className="hover:bg-[#12111d]/40 transition-colors">
-                          <td className="px-6 py-4 font-bold text-white">{u.name}</td>
-                          <td className="px-6 py-4">{u.email}</td>
-                          <td className="px-6 py-4 text-gray-500">
-                            {new Date(u.createdAt).toLocaleDateString('en-IN', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                            })}
+                          <td className="px-6 py-4 font-bold text-white">
+                            <Link to={`/profile/${u._id}`} className="hover:text-accent hover:underline">
+                              {u.name}
+                            </Link>
                           </td>
+                          <td className="px-6 py-4">{u.email}</td>
+                          <td className="px-6 py-4 text-purple-400 font-medium">{u.followersCount || u.followers?.length || 0}</td>
+                          <td className="px-6 py-4 text-purple-400 font-medium">{u.followingCount || u.following?.length || 0}</td>
                           <td className="px-6 py-4 text-center text-accent font-bold">
                             {u.certificateCount}
                           </td>

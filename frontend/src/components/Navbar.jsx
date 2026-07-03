@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Award, Shield, LogOut, Menu, X, Home, Grid, FolderOpen } from 'lucide-react';
+import { Award, Shield, LogOut, Menu, X, Home, Grid, FolderOpen, MessageSquare, Search, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function Navbar() {
@@ -88,12 +88,36 @@ export default function Navbar() {
             {user && (
               <>
                 <Link
+                  to="/chat"
+                  className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
+                    isActive('/chat') ? 'text-accent text-glow-purple' : 'text-gray-300 hover:text-white'
+                  }`}
+                >
+                  <MessageSquare className="h-4 w-4 text-purple-400" /> Chat
+                </Link>
+                <Link
+                  to="/search"
+                  className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
+                    isActive('/search') ? 'text-accent text-glow-purple' : 'text-gray-300 hover:text-white'
+                  }`}
+                >
+                  <Search className="h-4 w-4 text-purple-400" /> Search
+                </Link>
+                <Link
+                  to={`/profile/${user._id}`}
+                  className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
+                    isActive(`/profile/${user._id}`) ? 'text-accent text-glow-purple' : 'text-gray-300 hover:text-white'
+                  }`}
+                >
+                  <User className="h-4 w-4 text-purple-400" /> Profile
+                </Link>
+                <Link
                   to="/dashboard"
                   className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
                     isActive('/dashboard') ? 'text-accent text-glow-purple' : 'text-gray-300 hover:text-white'
                   }`}
                 >
-                  <FolderOpen className="h-4 w-4 text-purple-400" /> My Vault
+                  <FolderOpen className="h-4 w-4 text-purple-400" /> Vault
                 </Link>
                 <button
                   onClick={handleLogout}
@@ -191,13 +215,40 @@ export default function Navbar() {
           {user && (
             <>
               <Link
+                to="/chat"
+                onClick={() => setIsOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-md text-base font-medium ${
+                  isActive('/chat') ? 'bg-purple-950/30 text-accent' : 'text-gray-300 hover:bg-purple-950/10'
+                }`}
+              >
+                <MessageSquare className="h-5 w-5 text-purple-400" /> Chat
+              </Link>
+              <Link
+                to="/search"
+                onClick={() => setIsOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-md text-base font-medium ${
+                  isActive('/search') ? 'bg-purple-950/30 text-accent' : 'text-gray-300 hover:bg-purple-950/10'
+                }`}
+              >
+                <Search className="h-5 w-5 text-purple-400" /> Search
+              </Link>
+              <Link
+                to={`/profile/${user._id}`}
+                onClick={() => setIsOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-md text-base font-medium ${
+                  isActive(`/profile/${user._id}`) ? 'bg-purple-950/30 text-accent' : 'text-gray-300 hover:bg-purple-950/10'
+                }`}
+              >
+                <User className="h-5 w-5 text-purple-400" /> Profile
+              </Link>
+              <Link
                 to="/dashboard"
                 onClick={() => setIsOpen(false)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-md text-base font-medium ${
                   isActive('/dashboard') ? 'bg-purple-950/30 text-accent' : 'text-gray-300 hover:bg-purple-950/10'
                 }`}
               >
-                <FolderOpen className="h-5 w-5 text-purple-400" /> My Vault
+                <FolderOpen className="h-5 w-5 text-purple-400" /> Vault
               </Link>
               <button
                 onClick={() => {

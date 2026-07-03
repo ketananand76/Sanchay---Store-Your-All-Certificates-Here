@@ -67,6 +67,18 @@ const {
   uploadUserCertificate,
   deleteUserCertificate,
 } = require('./controllers/userPortalController');
+const {
+  toggleFollow,
+  searchUsers,
+  toggleLikeCertificate,
+  addComment,
+  deleteComment,
+  updateAdvancedProfile,
+  deleteAccount,
+  getAllUsers,
+  getUserProfile,
+} = require('./controllers/socialController');
+const { getChatMessages } = require('./controllers/messageController');
 const { getUsersAndCertificates } = require('./controllers/adminMonitorController');
 const { protectUser } = require('./middleware/authMiddleware');
 
@@ -88,14 +100,28 @@ app.get('/api/users/certificates', protectUser, getUserCertificates);
 app.post('/api/users/certificates', protectUser, upload.single('file'), validateCertificate, uploadUserCertificate);
 app.delete('/api/users/certificates/:id', protectUser, deleteUserCertificate);
 
-// 3. Admin Monitoring routes
+// 3. Social Portal routes (Follows, Likes, Comments, Profiles, settings)
+app.post('/api/social/follow/:id', protectUser, toggleFollow);
+app.get('/api/social/search', protectUser, searchUsers);
+app.post('/api/social/like/:id', protectUser, toggleLikeCertificate);
+app.post('/api/social/comment/:id', protectUser, addComment);
+app.delete('/api/social/comment/:certId/:commentId', protectUser, deleteComment);
+app.put('/api/social/profile', protectUser, upload.single('file'), updateAdvancedProfile);
+app.delete('/api/social/profile', protectUser, deleteAccount);
+app.get('/api/social/users', protectUser, getAllUsers);
+app.get('/api/social/profile/:id', protectUser, getUserProfile);
+
+// 4. Message / Chat routes
+app.get('/api/messages/:userId', protectUser, getChatMessages);
+
+// 5. Admin Monitoring routes
 app.get('/api/admin/users-monitor', protect, getUsersAndCertificates);
 
-// 4. Certificate public routes
+// 6. Certificate public routes
 app.get('/api/certificates', getCertificates);
 app.get('/api/certificates/:id', getCertificateById);
 
-// 5. Certificate protected admin routes
+// 7. Certificate protected admin routes
 app.post('/api/certificates', protect, upload.single('file'), validateCertificate, createCertificate);
 app.put('/api/certificates/:id', protect, upload.single('file'), (req, res, next) => {
   next();
@@ -105,7 +131,104 @@ app.delete('/api/certificates/:id', protect, deleteCertificate);
 // Centralized error handler
 app.use(errorHandler);
 
+// Wraps express in HTTP server to support Socket.io connections
+const http = require('http');
+const { Server } = require('socket.io');
+const Message = require('./models/Message');
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigin,
+    credentials: true,
+  },
+});
+
+// Sockets User Registry
+const onlineUsers = {}; // socket.id -> userId
+const userSockets = {}; // userId -> socket.id
+
+io.on('connection', (socket) => {
+  console.log('Socket client connected:', socket.id);
+
+  socket.on('register-user', (userId) => {
+    if (userId) {
+      onlineUsers[socket.id] = userId;
+      userSockets[userId] = socket.id;
+      io.emit('online-users', Object.values(onlineUsers));
+    }
+  });
+
+  socket.on('send-message', async ({ senderId, recipientId, content }) => {
+    try {
+      const msg = await Message.create({
+        sender: senderId,
+        recipient: recipientId,
+        content,
+      });
+
+      const recipientSocketId = userSockets[recipientId];
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit('receive-message', msg);
+      }
+      socket.emit('message-sent', msg);
+    } catch (err) {
+      console.error('Error saving message:', err);
+    }
+  });
+
+  // Video/Audio signaling
+  socket.on('call-user', ({ callerId, recipientId, signalData, type, callerName }) => {
+    const recipientSocketId = userSockets[recipientId];
+    if (recipientSocketId) {
+      io.to(recipientSocketId).emit('incoming-call', {
+        callerId,
+        callerName,
+        signalData,
+        type,
+      });
+    }
+  });
+
+  socket.on('answer-call', ({ callerId, recipientId, signalData }) => {
+    const callerSocketId = userSockets[callerId];
+    if (callerSocketId) {
+      io.to(callerSocketId).emit('call-accepted', {
+        recipientId,
+        signalData,
+      });
+    }
+  });
+
+  socket.on('ice-candidate', ({ targetId, candidate, senderId }) => {
+    const targetSocketId = userSockets[targetId];
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('ice-candidate', {
+        candidate,
+        senderId,
+      });
+    }
+  });
+
+  socket.on('end-call', ({ targetId, senderId }) => {
+    const targetSocketId = userSockets[targetId];
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('call-ended', { senderId });
+    }
+  });
+
+  socket.on('disconnect', () => {
+    const userId = onlineUsers[socket.id];
+    if (userId) {
+      delete userSockets[userId];
+      delete onlineUsers[socket.id];
+      io.emit('online-users', Object.values(onlineUsers));
+    }
+    console.log('Socket client disconnected:', socket.id);
+  });
+});
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });

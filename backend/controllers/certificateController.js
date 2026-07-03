@@ -34,12 +34,16 @@ const getCertificates = async (req, res, next) => {
     // Security context filtering:
     if (!isAdmin) {
       if (currentUser) {
-        // Logged-in standard user sees public admin certs OR their own certs
+        const userDoc = await User.findById(currentUser);
+        const followingIds = userDoc ? userDoc.following : [];
+        
+        // Logged-in standard user sees public admin certs OR their own certs OR followed users' certs
         conditions.push({
           $or: [
             { uploadedBy: null },
             { uploadedBy: { $exists: false } },
-            { uploadedBy: currentUser }
+            { uploadedBy: currentUser },
+            { uploadedBy: { $in: followingIds } }
           ]
         });
       } else {
