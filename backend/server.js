@@ -81,6 +81,7 @@ const {
 const { getChatMessages, markAsRead, getUnreadCounts } = require('./controllers/messageController');
 const { getUsersAndCertificates, approveCertificate, rejectCertificate } = require('./controllers/adminMonitorController');
 const { protectUser } = require('./middleware/authMiddleware');
+const upload = require('./config/upload');
 
 // Serve local static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -115,6 +116,13 @@ app.get('/api/social/profile/:id', protectUser, getUserProfile);
 app.get('/api/messages/unread/counts', protectUser, getUnreadCounts);
 app.get('/api/messages/:userId', protectUser, getChatMessages);
 app.put('/api/messages/:userId/read', protectUser, markAsRead);
+app.post('/api/messages/upload', protectUser, upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: 'No file uploaded' });
+  }
+  const fileUrl = `/uploads/${req.file.filename}`;
+  res.status(200).json({ success: true, fileUrl });
+});
 
 // 5. Admin Monitoring routes
 app.get('/api/admin/users-monitor', protect, getUsersAndCertificates);
@@ -166,12 +174,14 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('send-message', async ({ senderId, recipientId, content }) => {
+  socket.on('send-message', async ({ senderId, recipientId, content, messageType, fileUrl }) => {
     try {
       const msg = await Message.create({
         sender: senderId,
         recipient: recipientId,
         content,
+        messageType: messageType || 'text',
+        fileUrl: fileUrl || '',
       });
 
       // Broadcast to both participants' rooms for multi-tab sync
@@ -179,6 +189,42 @@ io.on('connection', (socket) => {
       io.to(String(senderId)).emit('receive-message', msg);
     } catch (err) {
       console.error('Error saving message:', err);
+    }
+  });
+
+  // Typing indicators
+  socket.on('typing', ({ senderId, recipientId, isTyping }) => {
+    io.to(String(recipientId)).emit('incoming-typing', { senderId, isTyping });
+  });
+
+  // Message Reactions
+  socket.on('react-message', async ({ messageId, userId, emoji }) => {
+    try {
+      const msg = await Message.findById(messageId);
+      if (msg) {
+        const existingReactionIndex = msg.reactions.findIndex(r => String(r.user) === String(userId));
+        if (existingReactionIndex > -1) {
+          if (msg.reactions[existingReactionIndex].emoji === emoji) {
+            // Remove if same emoji is clicked
+            msg.reactions.splice(existingReactionIndex, 1);
+          } else {
+            // Update to new emoji
+            msg.reactions[existingReactionIndex].emoji = emoji;
+          }
+        } else {
+          // Add new emoji reaction
+          msg.reactions.push({ user: userId, emoji });
+        }
+        await msg.save();
+        
+        // Broadcast updated reactions list to sender and recipient rooms
+        io.to(String(msg.sender)).to(String(msg.recipient)).emit('message-reaction-updated', {
+          messageId: msg._id,
+          reactions: msg.reactions,
+        });
+      }
+    } catch (err) {
+      console.error('Error reacting to message:', err);
     }
   });
 

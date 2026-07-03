@@ -21,6 +21,24 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    messageType: {
+      type: String,
+      enum: ['text', 'image'],
+      default: 'text',
+    },
+    fileUrl: {
+      type: String,
+      default: '',
+    },
+    reactions: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+        },
+        emoji: String,
+      }
+    ],
   },
   { timestamps: true }
 );
