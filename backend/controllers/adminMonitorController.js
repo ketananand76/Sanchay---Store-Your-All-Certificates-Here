@@ -55,6 +55,18 @@ const approveCertificate = async (req, res, next) => {
       });
     }
 
+    // Trigger approval notification
+    if (certificate.uploadedBy) {
+      const { createNotification } = require('./notificationController');
+      await createNotification(req.app, {
+        recipient: certificate.uploadedBy,
+        sender: null,
+        type: 'approval',
+        message: `Your certificate "${certificate.title}" has been approved by the Administrator.`,
+        relatedId: certificate._id,
+      });
+    }
+
     res.status(200).json({
       success: true,
       message: 'Certificate approved successfully',
@@ -85,6 +97,18 @@ const rejectCertificate = async (req, res, next) => {
         id: certificate._id,
         title: certificate.title,
         status: 'rejected',
+      });
+    }
+
+    // Trigger reject notification
+    if (certificate.uploadedBy) {
+      const { createNotification } = require('./notificationController');
+      await createNotification(req.app, {
+        recipient: certificate.uploadedBy,
+        sender: null,
+        type: 'reject',
+        message: `Your certificate "${certificate.title}" was rejected by the Administrator.`,
+        relatedId: certificate._id,
       });
     }
 

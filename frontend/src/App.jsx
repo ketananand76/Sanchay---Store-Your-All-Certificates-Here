@@ -27,6 +27,7 @@ import Settings from './pages/Settings';
 import UserProfile from './pages/UserProfile';
 import UserSearch from './pages/UserSearch';
 import Chat from './pages/Chat';
+import Notifications from './pages/Notifications';
 
 // Initialize React Query Client
 const queryClient = new QueryClient({
@@ -45,7 +46,7 @@ function AppLayout({ children }) {
       <div className="absolute inset-0 bg-mandala-pattern bg-center pointer-events-none opacity-25"></div>
       
       <Navbar />
-      <main className="flex-1 w-full relative z-10">{children}</main>
+      <main className="flex-1 w-full relative z-10 pb-20 md:pb-0">{children}</main>
       <Footer />
     </div>
   );
@@ -136,6 +137,14 @@ export default function App() {
               element={
                 <AppLayout>
                   <Settings />
+                </AppLayout>
+              }
+            />
+            <Route
+              path="/notifications"
+              element={
+                <AppLayout>
+                  <Notifications />
                 </AppLayout>
               }
             />

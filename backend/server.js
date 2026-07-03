@@ -80,6 +80,7 @@ const {
   reportAbusiveLanguage,
 } = require('./controllers/socialController');
 const { getChatMessages, markAsRead, getUnreadCounts } = require('./controllers/messageController');
+const { getNotifications, markAllAsRead } = require('./controllers/notificationController');
 const { 
   getUsersAndCertificates, approveCertificate, rejectCertificate, 
   getAdminAlerts, deleteAlert, unblockUser 
@@ -120,6 +121,8 @@ app.post('/api/social/report-abusive', protectUser, reportAbusiveLanguage);
 app.get('/api/messages/unread/counts', protectUser, getUnreadCounts);
 app.get('/api/messages/:userId', protectUser, getChatMessages);
 app.put('/api/messages/:userId/read', protectUser, markAsRead);
+app.get('/api/notifications', protectUser, getNotifications);
+app.put('/api/notifications/read', protectUser, markAllAsRead);
 app.post('/api/messages/upload', protectUser, upload.single('file'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, message: 'No file uploaded' });

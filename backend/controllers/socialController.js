@@ -32,6 +32,16 @@ const toggleFollow = async (req, res, next) => {
       // Follow
       currentUser.following.push(targetUserId);
       targetUser.followers.push(currentUserId);
+
+      // Trigger follow notification
+      const { createNotification } = require('./notificationController');
+      await createNotification(req.app, {
+        recipient: targetUserId,
+        sender: currentUserId,
+        type: 'follow',
+        message: `${currentUser.name} started following you.`,
+        relatedId: currentUserId,
+      });
     }
 
     await currentUser.save();
@@ -98,6 +108,20 @@ const toggleLikeCertificate = async (req, res, next) => {
     } else {
       // Like
       certificate.likes.push(userId);
+
+      // Trigger like notification
+      if (certificate.uploadedBy && String(certificate.uploadedBy) !== String(userId)) {
+        const { createNotification } = require('./notificationController');
+        const User = require('../models/User');
+        const senderUser = await User.findById(userId);
+        await createNotification(req.app, {
+          recipient: certificate.uploadedBy,
+          sender: userId,
+          type: 'like',
+          message: `${senderUser?.name || 'A user'} liked your certificate: "${certificate.title}"`,
+          relatedId: certificate._id,
+        });
+      }
     }
 
     await certificate.save();
@@ -142,6 +166,18 @@ const addComment = async (req, res, next) => {
 
     certificate.comments.push(newComment);
     await certificate.save();
+
+    // Trigger comment notification
+    if (certificate.uploadedBy && String(certificate.uploadedBy) !== String(userId)) {
+      const { createNotification } = require('./notificationController');
+      await createNotification(req.app, {
+        recipient: certificate.uploadedBy,
+        sender: userId,
+        type: 'comment',
+        message: `${user.name} commented on your certificate: "${text.trim().slice(0, 45)}"`,
+        relatedId: certificate._id,
+      });
+    }
 
     res.status(201).json({
       success: true,
