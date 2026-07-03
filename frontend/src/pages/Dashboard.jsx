@@ -2,22 +2,27 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import api, { getFileUrl } from '../utils/api';
-import { Plus, Edit2, Trash2, Star, ChevronLeft, ChevronRight, Loader2, Award, Search, ExternalLink } from 'lucide-react';
+import { 
+  Plus, Edit2, Trash2, Star, ChevronLeft, ChevronRight, Loader2, Award, 
+  Search, ExternalLink, Folder, FolderOpen, ShieldCheck, Check, X, 
+  ShieldAlert, Users, Clock, CheckCircle2, ArrowLeft, RefreshCw 
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
   
   // Tab states
-  const [activeTab, setActiveTab] = useState('certificates'); // 'certificates' or 'users'
-  const [expandedUser, setExpandedUser] = useState(null);
+  const [activeTab, setActiveTab] = useState('folders'); // 'folders', 'approvals', 'inventory'
+  const [folderSearch, setFolderSearch] = useState('');
+  const [selectedFolderUser, setSelectedFolderUser] = useState(null);
 
-  // Certificate Pagination & Filters
+  // Certificate Pagination & Filters (for Master Inventory tab)
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const limit = 8;
 
-  // Query: admin certificates
+  // Query: admin certificates (Master Inventory)
   const { data, isLoading, error } = useQuery({
     queryKey: ['adminCertificates', page, search],
     queryFn: async () => {
@@ -29,14 +34,13 @@ export default function Dashboard() {
     keepPreviousData: true,
   });
 
-  // Query: registered users monitor
+  // Query: registered users monitor (Folders View)
   const { data: monitorData, isLoading: loadingMonitor, error: monitorError } = useQuery({
     queryKey: ['adminUsersMonitor'],
     queryFn: async () => {
       const res = await api.get('/api/admin/users-monitor');
       return res.data;
     },
-    enabled: activeTab === 'users',
   });
 
   // Query: pending certificates
@@ -45,38 +49,6 @@ export default function Dashboard() {
     queryFn: async () => {
       const res = await api.get('/api/certificates', { params: { status: 'pending', limit: 100 } });
       return res.data;
-    },
-  });
-
-  // Mutation: Approve certificate
-  const approveMutation = useMutation({
-    mutationFn: async (id) => {
-      const res = await api.put(`/api/admin/certificates/${id}/approve`);
-      return res.data;
-    },
-    onSuccess: () => {
-      toast.success('Certificate approved successfully!');
-      queryClient.invalidateQueries({ queryKey: ['pendingCertificates'] });
-      queryClient.invalidateQueries({ queryKey: ['adminCertificates'] });
-    },
-    onError: (err) => {
-      toast.error(err.response?.data?.message || 'Approval failed');
-    },
-  });
-
-  // Mutation: Reject certificate
-  const rejectMutation = useMutation({
-    mutationFn: async (id) => {
-      const res = await api.put(`/api/admin/certificates/${id}/reject`);
-      return res.data;
-    },
-    onSuccess: () => {
-      toast.success('Certificate rejected successfully');
-      queryClient.invalidateQueries({ queryKey: ['pendingCertificates'] });
-      queryClient.invalidateQueries({ queryKey: ['adminCertificates'] });
-    },
-    onError: (err) => {
-      toast.error(err.response?.data?.message || 'Rejection failed');
     },
   });
 
@@ -121,14 +93,55 @@ export default function Dashboard() {
       toast.success('Certificate deleted successfully');
       queryClient.invalidateQueries({ queryKey: ['adminCertificates'] });
       queryClient.invalidateQueries({ queryKey: ['featuredCertificates'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingCertificates'] });
+      queryClient.invalidateQueries({ queryKey: ['adminUsersMonitor'] });
+      
+      // Update selected folder if open
+      if (selectedFolderUser) {
+        queryClient.refetchQueries({ queryKey: ['adminUsersMonitor'] });
+      }
     },
     onError: (err) => {
       toast.error(err.response?.data?.message || 'Delete failed');
     },
   });
 
+  // Mutation: Approve certificate
+  const approveMutation = useMutation({
+    mutationFn: async (id) => {
+      const res = await api.put(`/api/admin/certificates/${id}/approve`);
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success('Certificate approved successfully!');
+      queryClient.invalidateQueries({ queryKey: ['pendingCertificates'] });
+      queryClient.invalidateQueries({ queryKey: ['adminCertificates'] });
+      queryClient.invalidateQueries({ queryKey: ['adminUsersMonitor'] });
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Approval failed');
+    },
+  });
+
+  // Mutation: Reject certificate
+  const rejectMutation = useMutation({
+    mutationFn: async (id) => {
+      const res = await api.put(`/api/admin/certificates/${id}/reject`);
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success('Certificate rejected successfully');
+      queryClient.invalidateQueries({ queryKey: ['pendingCertificates'] });
+      queryClient.invalidateQueries({ queryKey: ['adminCertificates'] });
+      queryClient.invalidateQueries({ queryKey: ['adminUsersMonitor'] });
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Rejection failed');
+    },
+  });
+
   const handleDelete = (id, title) => {
-    if (window.confirm(`Are you sure you want to delete "${title}"?`)) {
+    if (window.confirm(`Are you sure you want to permanently delete "${title}"?`)) {
       deleteMutation.mutate(id);
     }
   };
@@ -138,22 +151,29 @@ export default function Dashboard() {
     updateOrderMutation.mutate({ id, order: newOrder });
   };
 
-  const toggleUserExpand = (userId) => {
-    setExpandedUser(expandedUser === userId ? null : userId);
-  };
+  // Filter folder directory users by search
+  const filteredUsers = monitorData?.users?.filter(u => 
+    u.name.toLowerCase().includes(folderSearch.toLowerCase()) || 
+    u.email.toLowerCase().includes(folderSearch.toLowerCase())
+  ) || [];
+
+  // Get active folder user statistics/certificates if selected
+  const activeFolderUser = selectedFolderUser
+    ? monitorData?.users?.find(u => String(u._id) === String(selectedFolderUser._id))
+    : null;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-screen relative z-10">
       <div className="absolute top-[5%] left-[-5%] w-[40vw] h-[40vw] bg-accent/5 rounded-full blur-[120px] pointer-events-none"></div>
 
-      {/* Title Header */}
+      {/* Header title section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
           <h1 className="font-accent text-3xl font-bold text-white tracking-wide">
             Management Panel
           </h1>
           <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">
-            Control Dashboard • Create, Edit, Reorder and Monitor Activity
+            Control Dashboard • Organize User Directories & Action Approvals
           </p>
         </div>
 
@@ -166,202 +186,324 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {/* Tab Navigation */}
+      {/* Statistics dashboard summary cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+        <div className="glass-panel p-5 rounded-2xl border-purple-950/40 flex items-center gap-4 bg-[#0c0a13]/40">
+          <div className="p-3 bg-purple-950/40 rounded-xl border border-purple-900/30 text-accent">
+            <Users className="h-6 w-6" />
+          </div>
+          <div>
+            <span className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Total Users</span>
+            <h3 className="text-2xl font-bold text-white mt-0.5">{monitorData?.count || 0}</h3>
+          </div>
+        </div>
+
+        <div className={`glass-panel p-5 rounded-2xl border-purple-950/40 flex items-center gap-4 bg-[#0c0a13]/40 ${
+          pendingData?.certificates?.length > 0 ? 'ring-1 ring-yellow-500/20 border-yellow-500/35' : ''
+        }`}>
+          <div className={`p-3 rounded-xl border ${
+            pendingData?.certificates?.length > 0
+              ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400 animate-pulse'
+              : 'bg-purple-950/40 border-purple-900/30 text-gray-400'
+          }`}>
+            <Clock className="h-6 w-6" />
+          </div>
+          <div>
+            <span className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Pending Reviews</span>
+            <h3 className="text-2xl font-bold text-white mt-0.5">{pendingData?.certificates?.length || 0}</h3>
+          </div>
+        </div>
+
+        <div className="glass-panel p-5 rounded-2xl border-purple-950/40 flex items-center gap-4 bg-[#0c0a13]/40">
+          <div className="p-3 bg-purple-950/40 rounded-xl border border-purple-900/30 text-emerald-400">
+            <CheckCircle2 className="h-6 w-6" />
+          </div>
+          <div>
+            <span className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Live Feed Posts</span>
+            <h3 className="text-2xl font-bold text-white mt-0.5">
+              {(data?.totalCount || 0) - (pendingData?.certificates?.length || 0)}
+            </h3>
+          </div>
+        </div>
+
+        <div className="glass-panel p-5 rounded-2xl border-purple-950/40 flex items-center gap-4 bg-[#0c0a13]/40">
+          <div className="p-3 bg-purple-950/40 rounded-xl border border-purple-900/30 text-indian-emerald">
+            <ShieldCheck className="h-6 w-6" />
+          </div>
+          <div>
+            <span className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Console Security</span>
+            <h3 className="text-[11px] text-indian-emerald font-bold uppercase tracking-wider mt-1.5 flex items-center gap-1">
+              ● Active SSL Tunnel
+            </h3>
+          </div>
+        </div>
+      </div>
+
+      {/* Tab Navigation header */}
       <div className="flex border-b border-purple-950/40 mb-6 max-w-md">
         <button
-          onClick={() => setActiveTab('certificates')}
+          onClick={() => { setSelectedFolderUser(null); setActiveTab('folders'); }}
           className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
-            activeTab === 'certificates'
+            activeTab === 'folders'
               ? 'border-accent text-accent'
               : 'border-transparent text-gray-500 hover:text-gray-300'
           }`}
         >
-          Inventory
+          📁 User Directories ({monitorData?.count || 0})
         </button>
         <button
-          onClick={() => setActiveTab('approvals')}
+          onClick={() => { setSelectedFolderUser(null); setActiveTab('approvals'); }}
           className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
             activeTab === 'approvals'
               ? 'border-accent text-accent'
               : 'border-transparent text-gray-500 hover:text-gray-300'
           }`}
         >
-          Approvals ({pendingData?.certificates?.length || 0})
+          📥 Action Queue ({pendingData?.certificates?.length || 0})
         </button>
         <button
-          onClick={() => setActiveTab('users')}
+          onClick={() => { setSelectedFolderUser(null); setActiveTab('inventory'); }}
           className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
-            activeTab === 'users'
+            activeTab === 'inventory'
               ? 'border-accent text-accent'
               : 'border-transparent text-gray-500 hover:text-gray-300'
           }`}
         >
-          Monitor Users ({monitorData?.count || 0})
+          Master Inventory
         </button>
       </div>
 
-      {/* Inventory tab panel */}
-      {activeTab === 'certificates' && (
-        <>
-          {/* Dashboard Filter Card */}
-          <div className="glass-panel rounded-2xl p-4 mb-6 flex flex-col sm:flex-row gap-4 border-purple-950/40">
-            <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-400" />
-              <input
-                type="text"
-                placeholder="Filter list by title or issuer..."
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-                className="w-full bg-[#07050d] border border-purple-950/70 hover:border-purple-800/40 focus:border-accent text-gray-200 pl-10 pr-4 py-2 rounded-xl text-sm focus:outline-none transition-all placeholder:text-gray-600"
-              />
-            </div>
-          </div>
-
-          {isLoading ? (
-            <div className="glass-panel rounded-2xl p-16 flex items-center justify-center border-purple-950/40">
-              <div className="text-center space-y-3">
-                <Loader2 className="h-8 w-8 animate-spin text-accent mx-auto" />
-                <p className="text-gray-400 text-sm">Loading inventory database...</p>
-              </div>
-            </div>
-          ) : error ? (
-            <div className="glass-panel rounded-2xl p-12 text-center text-red-400 border-red-950/50">
-              Error loading dashboard list. Check server connection.
-            </div>
-          ) : data?.certificates?.length === 0 ? (
-            <div className="glass-panel rounded-2xl p-16 text-center text-gray-500 border-purple-950/20">
-              {search ? 'No records match search filters.' : 'Inventory database empty. Add your first certificate.'}
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="glass-panel rounded-2xl overflow-hidden border-purple-950/40 shadow-xl">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-purple-950/20 border-b border-purple-950/50 text-gray-400 uppercase text-[10px] font-bold tracking-widest">
-                        <th className="px-6 py-4">Title & Issuer</th>
-                        <th className="px-6 py-4">Category</th>
-                        <th className="px-6 py-4 text-center">Featured</th>
-                        <th className="px-6 py-4 text-center">Order Index</th>
-                        <th className="px-6 py-4 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-purple-950/30 text-sm">
-                      {data?.certificates?.map((cert) => (
-                        <tr key={cert._id} className="hover:bg-[#12111d]/40 transition-colors">
-                          <td className="px-6 py-4">
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-white">{cert.title}</span>
-                              <span className="text-xs text-gray-500 mt-0.5">{cert.issuer}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="bg-purple-950/40 border border-purple-900/40 text-purple-400 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">
-                              {cert.category}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <button
-                              onClick={() =>
-                                toggleFeaturedMutation.mutate({ id: cert._id, featured: !cert.featured })
-                              }
-                              className={`inline-flex p-1.5 rounded-lg border transition-all ${
-                                cert.featured
-                                  ? 'bg-yellow-500/10 border-yellow-500/30 text-indian-gold'
-                                  : 'bg-purple-950/20 border-purple-950 text-gray-600 hover:text-purple-400'
-                              }`}
-                              title="Toggle Spotlight Feature"
-                            >
-                              <Star className="h-4.5 w-4.5 fill-current" />
-                            </button>
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <div className="inline-flex items-center gap-2.5 bg-[#07050d] border border-purple-950 px-2.5 py-1 rounded-xl">
-                              <button
-                                onClick={() => handleOrderChange(cert._id, cert.order, -1)}
-                                className="text-gray-500 hover:text-accent disabled:opacity-30"
-                                disabled={cert.order <= 0}
-                              >
-                                -
-                              </button>
-                              <span className="text-xs font-bold text-white w-6 text-center">{cert.order}</span>
-                              <button
-                                onClick={() => handleOrderChange(cert._id, cert.order, 1)}
-                                className="text-gray-500 hover:text-accent"
-                              >
-                                +
-                              </button>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex justify-end gap-2.5">
-                              <a
-                                href={getFileUrl(cert.fileUrl)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-2 rounded-lg border border-purple-950 bg-[#0d0a15]/30 text-gray-400 hover:text-white"
-                                title="View File"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </a>
-                              <Link
-                                to={`/admin/edit/${cert._id}`}
-                                className="p-2 rounded-lg border border-purple-950 bg-[#0d0a15]/30 text-blue-400 hover:bg-blue-500/10"
-                                title="Edit Certificate"
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </Link>
-                              <button
-                                onClick={() => handleDelete(cert._id, cert.title)}
-                                className="p-2 rounded-lg border border-red-500/10 bg-[#0d0a15]/30 text-red-400 hover:bg-red-500/10"
-                                title="Delete"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+      {/* ========================================== */}
+      {/* 📁 TAB: USER DIRECTORIES / FOLDERS VIEW     */}
+      {/* ========================================== */}
+      {activeTab === 'folders' && (
+        <div className="space-y-6">
+          {!selectedFolderUser ? (
+            <>
+              {/* Directory search card */}
+              <div className="glass-panel rounded-2xl p-4 flex gap-4 border-purple-950/40">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-400" />
+                  <input
+                    type="text"
+                    placeholder="Search folder directory by user name or email..."
+                    value={folderSearch}
+                    onChange={(e) => setFolderSearch(e.target.value)}
+                    className="w-full bg-[#07050d] border border-purple-950/70 hover:border-purple-800/40 focus:border-accent text-gray-200 pl-10 pr-4 py-2 rounded-xl text-sm focus:outline-none transition-all placeholder:text-gray-600"
+                  />
                 </div>
               </div>
 
-              {/* Pagination */}
-              {data.totalPages > 1 && (
-                <div className="flex items-center justify-between pt-4">
-                  <span className="text-xs font-semibold text-gray-500">
-                    Displaying page <span className="text-white">{page}</span> of{' '}
-                    <span className="text-white">{data.totalPages}</span>
-                  </span>
+              {/* Grid of Folders */}
+              {loadingMonitor ? (
+                <div className="py-16 flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-accent" />
+                </div>
+              ) : monitorError ? (
+                <div className="glass-panel p-12 text-center text-red-400 border-red-950/50">
+                  Failed to fetch user directory database.
+                </div>
+              ) : filteredUsers.length === 0 ? (
+                <div className="glass-panel p-16 text-center text-gray-500 border-purple-950/20">
+                  No directory folders match your filters.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {filteredUsers.map((u) => {
+                    const pendingCount = u.certificates?.filter(c => c.status === 'pending').length || 0;
+                    return (
+                      <button
+                        key={u._id}
+                        onClick={() => setSelectedFolderUser(u)}
+                        className="group relative flex flex-col bg-[#12111d]/50 rounded-2xl border border-purple-950/40 hover:border-purple-800/50 hover:bg-[#16152a]/70 p-5 shadow-xl hover:-translate-y-1 transition-all text-left w-full focus:outline-none"
+                      >
+                        {/* Golden/Indian-Gold Folder Icon */}
+                        <div className="flex items-start justify-between">
+                          <div className="text-indian-gold group-hover:scale-105 transition-transform duration-300">
+                            <Folder className="h-12 w-12 fill-current opacity-70 group-hover:opacity-90" />
+                          </div>
+                          {pendingCount > 0 && (
+                            <span className="bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 text-[9px] font-bold px-2 py-0.5 rounded-full animate-pulse">
+                              {pendingCount} review
+                            </span>
+                          )}
+                        </div>
 
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-                      disabled={page === 1}
-                      className="inline-flex items-center gap-1 text-xs font-bold border border-purple-950 hover:border-purple-800 bg-[#0d0a15]/50 px-3.5 py-2 rounded-xl text-gray-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
-                    >
-                      <ChevronLeft className="h-4 w-4" /> Prev
-                    </button>
-                    <button
-                      onClick={() => setPage((prev) => Math.min(prev + 1, data.totalPages))}
-                      disabled={page === data.totalPages}
-                      className="inline-flex items-center gap-1 text-xs font-bold border border-purple-950 hover:border-purple-800 bg-[#0d0a15]/50 px-3.5 py-2 rounded-xl text-gray-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
-                    >
-                      Next <ChevronRight className="h-4 w-4" />
-                    </button>
+                        <div className="mt-4 min-w-0 w-full">
+                          <h3 className="font-accent text-sm font-bold text-white truncate leading-tight group-hover:text-accent transition-colors">
+                            {u.name}
+                          </h3>
+                          <p className="text-[10px] text-gray-500 truncate mt-1">{u.email}</p>
+                          
+                          <div className="flex items-center gap-2 mt-4 pt-3 border-t border-purple-950/30 text-[10px] text-gray-400">
+                            <span className="font-bold text-white">{u.certificateCount || 0}</span> Certificates stored
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          ) : (
+            // ==========================================
+            // INSIDE SPECIFIC USER'S FOLDER VIEW
+            // ==========================================
+            <div className="space-y-6">
+              {/* Back to directory path header */}
+              <div className="flex items-center gap-2 text-xs font-semibold text-gray-500">
+                <button
+                  onClick={() => setSelectedFolderUser(null)}
+                  className="hover:text-white transition-colors flex items-center gap-1"
+                >
+                  Directory
+                </button>
+                <span>/</span>
+                <span className="text-indian-gold font-bold flex items-center gap-1">
+                  <FolderOpen className="h-3.5 w-3.5" /> {selectedFolderUser.name}'s Folder
+                </span>
+              </div>
+
+              {/* Folder metadata card */}
+              <div className="glass-panel p-5 rounded-2xl border-purple-950/40 bg-[#0c0a13]/70 flex flex-col sm:flex-row items-center gap-4 justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-purple-950 border border-purple-900/40 flex items-center justify-center font-bold text-sm text-purple-300">
+                    {selectedFolderUser.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 className="font-accent text-sm font-bold text-white">{selectedFolderUser.name}</h3>
+                    <p className="text-[10px] text-gray-500">{selectedFolderUser.email}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 text-xs">
+                  <div className="text-center">
+                    <span className="block font-bold text-white">{activeFolderUser?.certificates?.length || 0}</span>
+                    <span className="text-[9px] text-gray-500 uppercase tracking-widest">Total Uploads</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="block font-bold text-yellow-400">
+                      {activeFolderUser?.certificates?.filter(c => c.status === 'pending').length || 0}
+                    </span>
+                    <span className="text-[9px] text-gray-500 uppercase tracking-widest">Pending</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="block font-bold text-emerald-400">
+                      {activeFolderUser?.certificates?.filter(c => c.status === 'approved').length || 0}
+                    </span>
+                    <span className="text-[9px] text-gray-500 uppercase tracking-widest">Approved</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Certificates contained inside the folder (Approve/Reject actions remain after approval!) */}
+              {!activeFolderUser || activeFolderUser.certificates.length === 0 ? (
+                <div className="glass-panel p-16 text-center text-gray-500 border-purple-950/20">
+                  Folder is empty. No certificates uploaded yet.
+                </div>
+              ) : (
+                <div className="glass-panel rounded-2xl overflow-hidden border-purple-950/40 shadow-xl bg-[#0c0a13]/70">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-purple-950/20 border-b border-purple-950/50 text-gray-400 uppercase text-[10px] font-bold tracking-widest">
+                          <th className="px-6 py-4">Title & Issuer</th>
+                          <th className="px-6 py-4">Category</th>
+                          <th className="px-6 py-4 text-center">Status</th>
+                          <th className="px-6 py-4 text-center">Verify Link</th>
+                          <th className="px-6 py-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-purple-950/30 text-sm text-gray-300">
+                        {activeFolderUser.certificates.map((cert) => (
+                          <tr key={cert._id} className="hover:bg-[#12111d]/40 transition-colors">
+                            <td className="px-6 py-4">
+                              <div className="font-bold text-white">{cert.title}</div>
+                              <div className="text-xs text-gray-500">{cert.issuer}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="bg-purple-950/35 border border-purple-900/60 text-purple-300 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">
+                                {cert.category}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border ${
+                                cert.status === 'approved'
+                                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                                  : cert.status === 'rejected'
+                                  ? 'bg-red-500/15 border-red-500/30 text-red-400'
+                                  : 'bg-yellow-500/15 border-yellow-500/30 text-yellow-400'
+                              }`}>
+                                {cert.status || 'pending'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              {cert.verifyUrl ? (
+                                <a
+                                  href={cert.verifyUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-indian-gold hover:underline"
+                                >
+                                  Link <ExternalLink className="h-3 w-3" />
+                                </a>
+                              ) : (
+                                <span className="text-xs text-gray-600">—</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-right space-x-2">
+                              <a
+                                href={getFileUrl(cert.fileUrl)}
+                                target="_blank"
+                                  rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center text-xs font-semibold bg-purple-950/30 hover:bg-purple-900/40 text-purple-300 border border-purple-900/40 px-3 py-1.5 rounded-lg transition-colors mr-2"
+                              >
+                                View
+                              </a>
+
+                              {cert.status !== 'approved' && (
+                                <button
+                                  onClick={() => approveMutation.mutate(cert._id)}
+                                  disabled={approveMutation.isLoading}
+                                  className="inline-flex items-center justify-center text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                  Approve
+                                </button>
+                              )}
+
+                              {cert.status !== 'rejected' && (
+                                <button
+                                  onClick={() => rejectMutation.mutate(cert._id)}
+                                  disabled={rejectMutation.isLoading}
+                                  className="inline-flex items-center justify-center text-xs font-bold bg-red-650 hover:bg-red-750 text-white px-3.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                  Reject
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => handleDelete(cert._id, cert.title)}
+                                className="inline-flex items-center justify-center p-2 border border-red-500/10 bg-red-500/5 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
             </div>
           )}
-        </>
+        </div>
       )}
 
-      {/* Approvals tab panel */}
+      {/* ========================================== */}
+      {/* 📥 TAB: ACTION QUEUE (PENDING APPROVALS)   */}
+      {/* ========================================== */}
       {activeTab === 'approvals' && (
         <div className="space-y-6">
           {loadingPending ? (
@@ -370,11 +512,11 @@ export default function Dashboard() {
             </div>
           ) : pendingError ? (
             <div className="glass-panel rounded-2xl p-12 text-center text-red-400 border-red-950/50">
-              Failed to load pending certificates.
+              Failed to load pending reviews queue.
             </div>
           ) : pendingData?.certificates?.length === 0 ? (
             <div className="glass-panel rounded-2xl p-16 text-center text-gray-500 border-purple-950/20">
-              No pending certificates requiring approval.
+              No pending certificates requiring approval. All reviews clear!
             </div>
           ) : (
             <div className="glass-panel rounded-2xl overflow-hidden border-purple-950/40 shadow-xl bg-[#0c0a13]/70">
@@ -458,132 +600,154 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Users Monitor tab panel */}
-      {activeTab === 'users' && (
+      {/* ========================================== */}
+      {/* 📋 TAB: MASTER INVENTORY                     */}
+      {/* ========================================== */}
+      {activeTab === 'inventory' && (
         <>
-          {loadingMonitor ? (
+          {/* Dashboard Filter Card */}
+          <div className="glass-panel rounded-2xl p-4 mb-6 flex flex-col sm:flex-row gap-4 border-purple-950/40">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-400" />
+              <input
+                type="text"
+                placeholder="Filter list by title or issuer..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full bg-[#07050d] border border-purple-950/70 hover:border-purple-800/40 focus:border-accent text-gray-200 pl-10 pr-4 py-2 rounded-xl text-sm focus:outline-none transition-all placeholder:text-gray-600"
+              />
+            </div>
+          </div>
+
+          {isLoading ? (
             <div className="glass-panel rounded-2xl p-16 flex items-center justify-center border-purple-950/40">
               <div className="text-center space-y-3">
                 <Loader2 className="h-8 w-8 animate-spin text-accent mx-auto" />
-                <p className="text-gray-400 text-sm">Querying registrations...</p>
+                <p className="text-gray-400 text-sm">Loading inventory database...</p>
               </div>
             </div>
-          ) : monitorError ? (
+          ) : error ? (
             <div className="glass-panel rounded-2xl p-12 text-center text-red-400 border-red-950/50">
-              Failed to query users database. Check connection.
+              Error loading dashboard list. Check server connection.
             </div>
-          ) : monitorData?.users?.length === 0 ? (
+          ) : data?.certificates?.length === 0 ? (
             <div className="glass-panel rounded-2xl p-16 text-center text-gray-500 border-purple-950/20">
-              No registered user accounts found in the system.
+              {search ? 'No records match search filters.' : 'Inventory database empty. Add your first certificate.'}
             </div>
           ) : (
-            <div className="glass-panel rounded-2xl overflow-hidden border-purple-950/40 shadow-xl bg-[#0c0a13]/70">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-purple-950/20 border-b border-purple-950/50 text-gray-400 uppercase text-[10px] font-bold tracking-widest">
-                      <th className="px-6 py-4">Name</th>
-                      <th className="px-6 py-4">Email</th>
-                      <th className="px-6 py-4">Followers</th>
-                      <th className="px-6 py-4">Following</th>
-                      <th className="px-6 py-4 text-center">Posts (Certs)</th>
-                      <th className="px-6 py-4 text-right">Details</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-purple-950/30 text-sm text-gray-300">
-                    {monitorData.users.map((u) => (
-                      <React.Fragment key={u._id}>
-                        <tr className="hover:bg-[#12111d]/40 transition-colors">
-                          <td className="px-6 py-4 font-bold text-white">
-                            <Link to={`/profile/${u._id}`} className="hover:text-accent hover:underline">
-                              {u.name}
-                            </Link>
+            <div className="space-y-6">
+              <div className="glass-panel rounded-2xl overflow-hidden border-purple-950/40 shadow-xl bg-[#0c0a13]/70">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-purple-950/20 border-b border-purple-950/50 text-gray-400 uppercase text-[10px] font-bold tracking-widest">
+                        <th className="px-6 py-4">Title & Issuer</th>
+                        <th className="px-6 py-4">Category</th>
+                        <th className="px-6 py-4 text-center">Featured</th>
+                        <th className="px-6 py-4 text-center">Order Index</th>
+                        <th className="px-6 py-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-purple-950/30 text-sm text-gray-300">
+                      {data.certificates.map((cert) => (
+                        <tr key={cert._id} className="hover:bg-[#12111d]/40 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="font-bold text-white">{cert.title}</div>
+                            <div className="text-xs text-gray-500">{cert.issuer}</div>
                           </td>
-                          <td className="px-6 py-4">{u.email}</td>
-                          <td className="px-6 py-4 text-purple-400 font-medium">{u.followersCount || u.followers?.length || 0}</td>
-                          <td className="px-6 py-4 text-purple-400 font-medium">{u.followingCount || u.following?.length || 0}</td>
-                          <td className="px-6 py-4 text-center text-accent font-bold">
-                            {u.certificateCount}
+                          <td className="px-6 py-4">
+                            <span className="bg-purple-950/35 border border-purple-900/60 text-purple-300 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">
+                              {cert.category}
+                            </span>
                           </td>
-                          <td className="px-6 py-4 text-right">
+                          <td className="px-6 py-4 text-center">
                             <button
-                              onClick={() => toggleUserExpand(u._id)}
-                              className="text-xs text-purple-400 hover:text-white font-bold transition-colors"
+                              onClick={() => toggleFeaturedMutation.mutate({ id: cert._id, featured: !cert.featured })}
+                              className="text-indian-gold hover:scale-110 transition-transform"
                             >
-                              {expandedUser === u._id ? 'Hide Uploads ▲' : 'Show Uploads ▼'}
+                              <Star className={`h-5 w-5 ${cert.featured ? 'fill-current' : 'opacity-25'}`} />
                             </button>
                           </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => handleOrderChange(cert._id, cert.order, -1)}
+                                className="px-2 py-1 rounded bg-[#0d0a15]/30 hover:bg-purple-950/50 border border-purple-950 text-xs font-bold"
+                              >
+                                -
+                              </button>
+                              <span className="font-mono text-xs w-6 text-center text-white">{cert.order}</span>
+                              <button
+                                onClick={() => handleOrderChange(cert._id, cert.order, 1)}
+                                className="px-2 py-1 rounded bg-[#0d0a15]/30 hover:bg-purple-950/50 border border-purple-950 text-xs font-bold"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end gap-2.5">
+                              <a
+                                href={getFileUrl(cert.fileUrl)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 rounded-lg border border-purple-950 bg-[#0d0a15]/30 text-gray-400 hover:text-white"
+                                title="View File"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                              <Link
+                                to={`/admin/edit/${cert._id}`}
+                                className="p-2 rounded-lg border border-purple-950 bg-[#0d0a15]/30 text-blue-400 hover:bg-blue-500/10"
+                                title="Edit Certificate"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Link>
+                              <button
+                                onClick={() => handleDelete(cert._id, cert.title)}
+                                className="p-2 rounded-lg border border-red-500/10 bg-[#0d0a15]/30 text-red-400 hover:bg-red-500/10"
+                                title="Delete"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
-
-                        {/* Collapsible details row */}
-                        {expandedUser === u._id && (
-                          <tr>
-                            <td colSpan="6" className="bg-[#08070d]/90 px-8 py-5 border-b border-purple-950/40">
-                              {u.certificates.length === 0 ? (
-                                <p className="text-xs text-gray-500 italic">This user has not stored any credentials yet.</p>
-                              ) : (
-                                <div className="space-y-4">
-                                  <h4 className="text-[10px] uppercase font-bold text-indian-gold tracking-widest">
-                                    Stored Credentials Checklist ({u.certificateCount})
-                                  </h4>
-                                  <table className="w-full text-left text-xs border-collapse">
-                                    <thead>
-                                      <tr className="border-b border-purple-950/50 pb-2 text-[9px] font-bold uppercase tracking-wider text-gray-600">
-                                        <th className="pb-2">Document Title</th>
-                                        <th className="pb-2">Issuer Org</th>
-                                        <th className="pb-2">Category</th>
-                                        <th className="pb-2 text-right">Actions</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-purple-950/15">
-                                      {u.certificates.map((c) => (
-                                        <tr key={c._id} className="hover:bg-purple-950/10">
-                                          <td className="py-2.5 font-semibold text-white">{c.title}</td>
-                                          <td className="py-2.5 text-gray-400">{c.issuer}</td>
-                                          <td className="py-2.5">
-                                            <span className="bg-purple-950/30 text-purple-400 px-2 py-0.5 rounded text-[8px] font-bold uppercase border border-purple-900/30">
-                                              {c.category}
-                                            </span>
-                                          </td>
-                                          <td className="py-2.5 text-right">
-                                            <div className="flex justify-end gap-3 text-[10px]">
-                                              <a
-                                                href={getFileUrl(c.fileUrl)}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-purple-400 hover:text-purple-200 font-semibold"
-                                              >
-                                                View File
-                                              </a>
-                                              {c.verifyUrl && (
-                                                <>
-                                                  <span className="text-gray-800">|</span>
-                                                  <a
-                                                    href={c.verifyUrl}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-indian-gold hover:text-yellow-400 font-semibold"
-                                                  >
-                                                    Verify URL
-                                                  </a>
-                                                </>
-                                              )}
-                                            </div>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+
+              {/* Master Inventory Pagination */}
+              {data.totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4">
+                  <span className="text-xs font-semibold text-gray-500">
+                    Displaying page <span className="text-white">{page}</span> of{' '}
+                    <span className="text-white">{data.totalPages}</span>
+                  </span>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                      disabled={page === 1}
+                      className="inline-flex items-center gap-1 text-xs font-bold border border-purple-950 hover:border-purple-800 bg-[#0d0a15]/50 px-3.5 py-2 rounded-xl text-gray-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
+                    >
+                      <ChevronLeft className="h-4 w-4" /> Prev
+                    </button>
+                    <button
+                      onClick={() => setPage((prev) => Math.min(prev + 1, data.totalPages))}
+                      disabled={page === data.totalPages}
+                      className="inline-flex items-center gap-1 text-xs font-bold border border-purple-950 hover:border-purple-800 bg-[#0d0a15]/50 px-3.5 py-2 rounded-xl text-gray-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
+                    >
+                      Next <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>
