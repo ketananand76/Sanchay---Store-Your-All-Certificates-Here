@@ -28,37 +28,45 @@ export default function CertificateForm() {
   const [previewFileType, setPreviewFileType] = useState('image');
 
   // Load existing data in edit mode
-  const { data: cert, isLoading: isFetching } = useQuery({
+  const { data: cert, isLoading: isFetching, isError } = useQuery({
     queryKey: ['certificateDetail', id],
     queryFn: async () => {
       const res = await api.get(`/api/certificates/${id}`);
       return res.data.certificate;
     },
     enabled: isEditMode,
-    onSuccess: (data) => {
-      setTitle(data.title);
-      setIssuer(data.issuer);
-      setDateIssued(new Date(data.dateIssued).toISOString().split('T')[0]);
-      setCategory(data.category);
-      setDescription(data.description || '');
-      setVerifyUrl(data.verifyUrl || '');
-      setFeatured(data.featured || false);
-      setOrder(data.order || 0);
+  });
+
+  // Initialize form fields when certificate data is fetched
+  useEffect(() => {
+    if (cert) {
+      setTitle(cert.title);
+      setIssuer(cert.issuer);
+      setDateIssued(new Date(cert.dateIssued).toISOString().split('T')[0]);
+      setCategory(cert.category);
+      setDescription(cert.description || '');
+      setVerifyUrl(cert.verifyUrl || '');
+      setFeatured(cert.featured || false);
+      setOrder(cert.order || 0);
 
       // Setup initial preview url
-      if (data.fileUrl) {
-        const fullUrl = data.fileUrl.startsWith('/uploads')
-          ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${data.fileUrl}`
-          : data.fileUrl;
+      if (cert.fileUrl) {
+        const fullUrl = cert.fileUrl.startsWith('/uploads')
+          ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${cert.fileUrl}`
+          : cert.fileUrl;
         setPreviewUrl(fullUrl);
-        setPreviewFileType(data.fileType || 'image');
+        setPreviewFileType(cert.fileType || 'image');
       }
-    },
-    onError: () => {
+    }
+  }, [cert]);
+
+  // Handle fetch error redirects
+  useEffect(() => {
+    if (isError) {
       toast.error('Failed to load certificate data');
       navigate('/admin/dashboard');
-    },
-  });
+    }
+  }, [isError, navigate]);
 
   // Revoke object URL on cleanup
   useEffect(() => {
