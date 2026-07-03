@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import api, { getFileUrl } from '../utils/api';
 import { 
   ThumbsUp, MessageSquare, Share2, Send, ShieldCheck, Loader2, 
-  FileText, ArrowRight, Award, Plus, CheckCircle2, ExternalLink
+  FileText, ArrowRight, Award, Plus, CheckCircle2, ExternalLink, Search
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -16,6 +16,7 @@ export default function Home() {
   
   const [commentInputs, setCommentInputs] = useState({});
   const [expandedComments, setExpandedComments] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
 
   // ----------------------------------------------------
   // QUERIES & MUTATIONS
@@ -136,7 +137,13 @@ export default function Home() {
   // VIEW: LOGGED-IN LINKEDIN-STYLE SOCIAL FEED
   // ----------------------------------------------------
   if (user) {
-    const feed = feedData?.certificates || [];
+    const rawFeed = feedData?.certificates || [];
+    const feed = rawFeed.filter(post => 
+      post.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      post.issuer?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      post.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (post.uploadedBy && post.uploadedBy.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
     
     // Filters recommendations (Lobby users whom you aren't following yet)
     const recommendations = lobbyUsers?.filter(
@@ -208,6 +215,18 @@ export default function Home() {
           {/* MIDDLE COLUMN: CREATOR BOX & STREAM (9 col) */}
           {/* ========================================== */}
           <div className="lg:col-span-9 space-y-5">
+            {/* Real-time search box */}
+            <div className="glass-panel p-4 rounded-2xl border-purple-950/45 bg-[#0c0a13]/85 shadow-lg relative flex items-center">
+              <Search className="absolute left-7.5 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-400" />
+              <input
+                type="text"
+                placeholder="Search feed by title, issuer, or developer name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[#050409] border border-purple-950/70 hover:border-purple-800/40 focus:border-accent text-gray-200 pl-10 pr-4 py-2.5 rounded-full text-xs focus:outline-none transition-all placeholder:text-gray-600"
+              />
+            </div>
+
             {/* Create Post trigger block */}
             <div className="glass-panel p-4 rounded-2xl border-purple-950/45 bg-[#0c0a13]/85 shadow-lg flex items-center gap-3.5">
               <div className="w-9 h-9 rounded-full bg-purple-950 border border-purple-900 flex items-center justify-center font-bold text-xs text-purple-300 overflow-hidden shrink-0">

@@ -28,8 +28,13 @@ export const socketUrl = import.meta.env.DEV
 
 export const getFileUrl = (url) => {
   if (!url) return '';
-  return url.startsWith('/uploads')
-    ? (import.meta.env.DEV ? (import.meta.env.VITE_API_URL || 'http://localhost:5000') : '') + url
+  const normalized = url.startsWith('/') ? url : '/' + url;
+  const backendUrl = import.meta.env.DEV 
+    ? (import.meta.env.VITE_API_URL || 'http://localhost:5000') 
+    : 'https://sanchay-store-your-all-certificates-here.onrender.com';
+
+  return normalized.startsWith('/uploads')
+    ? backendUrl + normalized
     : url;
 };
 
