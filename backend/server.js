@@ -191,6 +191,22 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Group Chats
+  socket.on('join-group', (groupId) => {
+    socket.join(groupId);
+    console.log(`[Socket] User joined group room: ${groupId}`);
+  });
+
+  socket.on('send-group-message', ({ senderId, senderName, groupId, content }) => {
+    io.to(groupId).emit('receive-group-message', {
+      senderId,
+      senderName,
+      groupId,
+      content,
+      createdAt: new Date().toISOString(),
+    });
+  });
+
   // Typing indicators
   socket.on('typing', ({ senderId, recipientId, isTyping }) => {
     io.to(String(recipientId)).emit('incoming-typing', { senderId, isTyping });

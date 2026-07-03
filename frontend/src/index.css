@@ -91,3 +91,17 @@
   animation: shimmer 2s infinite;
   content: '';
 }
+
+/* WhatsApp status bar progression animation */
+@keyframes statusBarProgress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.animate-status-bar {
+  animation: statusBarProgress 5s linear forwards;
+}
