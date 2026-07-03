@@ -205,9 +205,9 @@ export default function Home() {
           </div>
 
           {/* ========================================== */}
-          {/* MIDDLE COLUMN: CREATOR BOX & STREAM (6 col) */}
+          {/* MIDDLE COLUMN: CREATOR BOX & STREAM (9 col) */}
           {/* ========================================== */}
-          <div className="lg:col-span-6 space-y-5">
+          <div className="lg:col-span-9 space-y-5">
             {/* Create Post trigger block */}
             <div className="glass-panel p-4 rounded-2xl border-purple-950/45 bg-[#0c0a13]/85 shadow-lg flex items-center gap-3.5">
               <div className="w-9 h-9 rounded-full bg-purple-950 border border-purple-900 flex items-center justify-center font-bold text-xs text-purple-300 overflow-hidden shrink-0">
@@ -234,13 +234,13 @@ export default function Home() {
               <div className="glass-panel p-16 rounded-2xl border-purple-950/20 text-center space-y-4 bg-[#0c0a13]/40">
                 <p className="text-gray-500 text-sm">Your social stream is empty.</p>
                 <p className="text-xs text-gray-600 max-w-xs mx-auto">
-                  Follow developers in the right sidebar or find peers in the directory to see posts!
+                  Feed database is empty. Upload your first certificate to share it on the feed!
                 </p>
                 <Link
-                  to="/search"
+                  to="/dashboard"
                   className="inline-flex bg-accent text-white font-bold px-4 py-2 rounded-xl text-xs hover:bg-accent-dark transition-all"
                 >
-                  Search Developers
+                  Upload Certificate
                 </Link>
               </div>
             ) : (
@@ -433,58 +433,6 @@ export default function Home() {
               </div>
             )}
           </div>
-
-          {/* ========================================== */}
-          {/* RIGHT SIDEBAR: FOLLOW RECOMMENDATIONS (3 c) */}
-          {/* ========================================== */}
-          <div className="lg:col-span-3 space-y-4">
-            <div className="glass-panel p-4.5 rounded-2xl border-purple-950/45 bg-[#0c0a13]/85 shadow-xl space-y-4">
-              <div>
-                <h3 className="font-accent text-xs font-bold text-white uppercase tracking-wider">Add to your feed</h3>
-                <p className="text-[9px] text-gray-500 uppercase tracking-widest font-semibold mt-0.5">Suggested Developers</p>
-              </div>
-
-              {loadingLobby ? (
-                <div className="py-8 flex justify-center">
-                  <Loader2 className="h-5 w-5 animate-spin text-accent" />
-                </div>
-              ) : recommendations.length === 0 ? (
-                <p className="text-[10px] text-gray-500 italic">No recommendations. You follow all developers!</p>
-              ) : (
-                <div className="space-y-3.5">
-                  {recommendations.map((rec) => (
-                    <div key={rec._id} className="flex items-center justify-between gap-2.5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-purple-950 flex items-center justify-center font-bold text-xs text-purple-300 overflow-hidden shrink-0">
-                          {rec.profilePicture ? (
-                            <img src={getFileUrl(rec.profilePicture)} alt={rec.name} className="w-full h-full object-cover" />
-                          ) : (
-                            rec.name.charAt(0).toUpperCase()
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="text-xs font-bold text-white hover:underline truncate">
-                            <Link to={`/profile/${rec._id}`}>{rec.name}</Link>
-                          </h4>
-                          <span className="block text-[8px] text-gray-500 uppercase font-semibold mt-0.5 tracking-wider truncate">
-                            {rec.role === 'seeker' ? 'Developer' : 'Employer'}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => followMutation.mutate(rec._id)}
-                        disabled={followMutation.isLoading}
-                        className="text-[10px] font-bold text-accent hover:text-white border border-accent/20 hover:bg-accent bg-accent/5 px-2.5 py-1 rounded-full transition-all shrink-0"
-                      >
-                        + Follow
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
         </div>
       </div>
     );
