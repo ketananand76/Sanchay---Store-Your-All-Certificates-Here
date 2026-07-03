@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '../utils/api';
+import api, { getFileUrl } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { Search, UserPlus, UserCheck, Loader2, ArrowLeft } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -108,7 +108,7 @@ export default function UserSearch() {
                   <div className="w-12 h-12 rounded-full bg-purple-950/30 border border-purple-800/40 flex items-center justify-center font-accent text-lg font-bold text-purple-300 overflow-hidden shrink-0">
                     {u.profilePicture ? (
                       <img
-                        src={u.profilePicture.startsWith('/uploads') ? `${import.meta.env.VITE_API_URL || ''}${u.profilePicture}` : u.profilePicture}
+                        src={getFileUrl(u.profilePicture)}
                         alt={u.name}
                         className="w-full h-full object-cover"
                       />

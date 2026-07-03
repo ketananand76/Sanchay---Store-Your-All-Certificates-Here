@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '../utils/api';
+import api, { getFileUrl } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { Award, ArrowRight, ShieldCheck, FileText, ChevronRight, Heart, MessageCircle, Send, ExternalLink, Globe, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -147,7 +147,7 @@ export default function Home() {
                           <ShieldCheck className="h-4.5 w-4.5 text-indian-gold" />
                         ) : post.uploadedBy.profilePicture ? (
                           <img
-                            src={post.uploadedBy.profilePicture.startsWith('/uploads') ? `${import.meta.env.VITE_API_URL || ''}${post.uploadedBy.profilePicture}` : post.uploadedBy.profilePicture}
+                            src={getFileUrl(post.uploadedBy.profilePicture)}
                             alt={post.uploadedBy.name}
                             className="w-full h-full object-cover"
                           />
@@ -179,7 +179,7 @@ export default function Home() {
                       </div>
                     ) : (
                       <img
-                        src={post.fileUrl.startsWith('/uploads') ? `${import.meta.env.VITE_API_URL || ''}${post.fileUrl}` : post.fileUrl}
+                        src={getFileUrl(post.fileUrl)}
                         alt={post.title}
                         className="w-full h-full object-cover"
                         loading="lazy"
@@ -412,7 +412,7 @@ export default function Home() {
                       </div>
                     ) : (
                       <img
-                        src={cert.fileUrl.startsWith('/uploads') ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${cert.fileUrl}` : cert.fileUrl}
+                        src={getFileUrl(cert.fileUrl)}
                         alt={cert.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         loading="lazy"

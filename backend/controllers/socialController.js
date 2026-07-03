@@ -301,7 +301,10 @@ const getAllUsers = async (req, res, next) => {
 const getUserProfile = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const user = await User.findById(id).select('-passwordHash');
+    const user = await User.findById(id)
+      .select('-passwordHash')
+      .populate('followers', 'name email profilePicture bio')
+      .populate('following', 'name email profilePicture bio');
     if (!user) {
       res.status(404);
       throw new Error('User profile not found');

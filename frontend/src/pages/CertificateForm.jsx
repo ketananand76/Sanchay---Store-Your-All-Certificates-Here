@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '../utils/api';
+import api, { getFileUrl } from '../utils/api';
 import { ArrowLeft, Upload, FileText, Star, Loader2, Award, Calendar, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -51,9 +51,7 @@ export default function CertificateForm() {
 
       // Setup initial preview url
       if (cert.fileUrl) {
-        const fullUrl = cert.fileUrl.startsWith('/uploads')
-          ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${cert.fileUrl}`
-          : cert.fileUrl;
+        const fullUrl = getFileUrl(cert.fileUrl);
         setPreviewUrl(fullUrl);
         setPreviewFileType(cert.fileType || 'image');
       }

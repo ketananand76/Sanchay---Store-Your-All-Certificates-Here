@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import api from '../utils/api';
+import api, { getFileUrl } from '../utils/api';
 import { Plus, Edit2, Trash2, Star, ChevronLeft, ChevronRight, Loader2, Award, Search, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -299,7 +299,7 @@ export default function Dashboard() {
                           <td className="px-6 py-4 text-right">
                             <div className="flex justify-end gap-2.5">
                               <a
-                                href={cert.fileUrl.startsWith('/uploads') ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${cert.fileUrl}` : cert.fileUrl}
+                                href={getFileUrl(cert.fileUrl)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="p-2 rounded-lg border border-purple-950 bg-[#0d0a15]/30 text-gray-400 hover:text-white"
@@ -426,7 +426,7 @@ export default function Dashboard() {
                         </td>
                         <td className="px-6 py-4 text-right space-x-2">
                           <a
-                            href={cert.fileUrl.startsWith('/uploads') ? `${import.meta.env.VITE_API_URL || ''}${cert.fileUrl}` : cert.fileUrl}
+                            href={getFileUrl(cert.fileUrl)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center justify-center text-xs font-semibold bg-purple-950/30 hover:bg-purple-900/40 text-purple-300 border border-purple-900/40 px-3 py-1.5 rounded-lg transition-colors mr-2"
@@ -548,7 +548,7 @@ export default function Dashboard() {
                                           <td className="py-2.5 text-right">
                                             <div className="flex justify-end gap-3 text-[10px]">
                                               <a
-                                                href={c.fileUrl.startsWith('/uploads') ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${c.fileUrl}` : c.fileUrl}
+                                                href={getFileUrl(c.fileUrl)}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="text-purple-400 hover:text-purple-200 font-semibold"

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '../utils/api';
+import api, { getFileUrl } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { Award, Plus, Trash2, ExternalLink, Calendar, FileText, Upload, Loader2, LogOut, ShieldCheck, ShieldAlert, Sparkles, CheckCircle2, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -429,7 +429,7 @@ export default function UserDashboard() {
                   </div>
                 ) : (
                   <img
-                    src={cert.fileUrl.startsWith('/uploads') ? `${import.meta.env.VITE_API_URL || ''}${cert.fileUrl}` : cert.fileUrl}
+                    src={getFileUrl(cert.fileUrl)}
                     alt={cert.title}
                     className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
                   />
@@ -482,7 +482,7 @@ export default function UserDashboard() {
 
                 <div className="flex gap-2 mt-4 pt-3 border-t border-purple-950/20">
                   <a
-                    href={cert.fileUrl.startsWith('/uploads') ? `${import.meta.env.VITE_API_URL || ''}${cert.fileUrl}` : cert.fileUrl}
+                    href={getFileUrl(cert.fileUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1 inline-flex items-center justify-center text-[10px] font-bold bg-purple-950/30 hover:bg-purple-900/40 text-purple-200 border border-purple-900/40 py-1.5 rounded-lg transition-colors"

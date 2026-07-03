@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '../utils/api';
+import api, { getFileUrl } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { Globe, Code, Briefcase, MessageSquare, Lock, Heart, Award, Calendar, Loader2, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -11,6 +11,8 @@ export default function UserProfile() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user: currentUser, admin } = useAuth();
+
+  const [listModal, setListModal] = useState({ show: false, title: '', users: [] });
 
   const isSelf = currentUser && String(currentUser._id) === String(id);
   const isAdmin = !!admin;
@@ -59,7 +61,7 @@ export default function UserProfile() {
   }
 
   const { user, certificates } = data;
-  const isFollowing = currentUser && user.followers?.includes(currentUser._id);
+  const isFollowing = currentUser && user.followers?.some(f => String(f._id || f) === String(currentUser._id));
   const isPrivate = user.privateAccount && !isSelf && !isFollowing && !isAdmin;
 
   const handleFollowClick = () => {
@@ -92,7 +94,7 @@ export default function UserProfile() {
           <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-purple-950/30 border-2 border-purple-800/40 overflow-hidden flex items-center justify-center font-accent text-3xl font-bold text-purple-300 shrink-0 shadow-lg">
             {user.profilePicture ? (
               <img
-                src={user.profilePicture.startsWith('/uploads') ? `${import.meta.env.VITE_API_URL || ''}${user.profilePicture}` : user.profilePicture}
+                src={getFileUrl(user.profilePicture)}
                 alt={user.name}
                 className="w-full h-full object-cover"
               />
@@ -118,14 +120,20 @@ export default function UserProfile() {
                 <span className="text-white font-bold text-sm block">{certificates.length}</span>
                 <span className="text-gray-500 uppercase tracking-wider text-[9px]">Certificates</span>
               </div>
-              <div>
+              <button
+                onClick={() => setListModal({ show: true, title: 'Followers', users: user.followers || [] })}
+                className="text-left cursor-pointer hover:opacity-85 transition-opacity focus:outline-none"
+              >
                 <span className="text-white font-bold text-sm block">{user.followers?.length || 0}</span>
-                <span className="text-gray-500 uppercase tracking-wider text-[9px]">Followers</span>
-              </div>
-              <div>
+                <span className="text-gray-500 uppercase tracking-wider text-[9px] hover:text-purple-400">Followers</span>
+              </button>
+              <button
+                onClick={() => setListModal({ show: true, title: 'Following', users: user.following || [] })}
+                className="text-left cursor-pointer hover:opacity-85 transition-opacity focus:outline-none"
+              >
                 <span className="text-white font-bold text-sm block">{user.following?.length || 0}</span>
-                <span className="text-gray-500 uppercase tracking-wider text-[9px]">Following</span>
-              </div>
+                <span className="text-gray-500 uppercase tracking-wider text-[9px] hover:text-purple-400">Following</span>
+              </button>
             </div>
 
             {/* User Bio */}
@@ -241,7 +249,7 @@ export default function UserProfile() {
                     </div>
                   ) : (
                     <img
-                      src={cert.fileUrl.startsWith('/uploads') ? `${import.meta.env.VITE_API_URL || ''}${cert.fileUrl}` : cert.fileUrl}
+                      src={getFileUrl(cert.fileUrl)}
                       alt={cert.title}
                       className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
                     />
@@ -267,6 +275,60 @@ export default function UserProfile() {
           </div>
         )}
       </div>
+
+      {/* Followers / Following List Modal */}
+      {listModal.show && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#07050b]/80 backdrop-blur-md p-4">
+          <div className="w-full max-w-md bg-[#12111d] glass-panel border border-purple-950/40 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-purple-950/30 pb-3">
+              <h3 className="font-accent text-sm font-bold text-white uppercase tracking-wider">
+                {listModal.title}
+              </h3>
+              <button
+                onClick={() => setListModal({ show: false, title: '', users: [] })}
+                className="text-xs text-purple-400 hover:text-white font-bold transition-colors focus:outline-none"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="max-h-60 overflow-y-auto space-y-3 pr-1">
+              {listModal.users.length === 0 ? (
+                <div className="text-center text-xs text-gray-500 py-6">
+                  No {listModal.title.toLowerCase()} found.
+                </div>
+              ) : (
+                listModal.users.map((u) => (
+                  <div
+                    key={u._id}
+                    onClick={() => {
+                      setListModal({ show: false, title: '', users: [] });
+                      navigate(`/profile/${u._id}`);
+                    }}
+                    className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-purple-950/20 border border-transparent hover:border-purple-900/35 cursor-pointer transition-all"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-purple-900/40 border border-purple-800/40 overflow-hidden flex items-center justify-center font-bold text-xs text-purple-300">
+                      {u.profilePicture ? (
+                        <img
+                          src={getFileUrl(u.profilePicture)}
+                          alt={u.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        u.name?.charAt(0).toUpperCase()
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-white truncate leading-tight">{u.name}</div>
+                      <div className="text-[10px] text-gray-500 truncate mt-0.5">{u.email}</div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

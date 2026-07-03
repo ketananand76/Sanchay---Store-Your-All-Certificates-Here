@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import api from '../utils/api';
+import api, { getFileUrl } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { ArrowLeft, ExternalLink, Download, Calendar, ShieldCheck, Tag, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -60,11 +60,7 @@ export default function CertificateDetail() {
   };
 
   const getFullFileUrl = (url) => {
-    if (!url) return '';
-    if (url.startsWith('/uploads')) {
-      return `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${url}`;
-    }
-    return url;
+    return getFileUrl(url);
   };
 
   const handleDownload = () => {

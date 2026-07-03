@@ -9,4 +9,11 @@ const api = axios.create({
   },
 });
 
+export const getFileUrl = (url) => {
+  if (!url) return '';
+  return url.startsWith('/uploads')
+    ? (import.meta.env.DEV ? (import.meta.env.VITE_API_URL || 'http://localhost:5000') : '') + url
+    : url;
+};
+
 export default api;

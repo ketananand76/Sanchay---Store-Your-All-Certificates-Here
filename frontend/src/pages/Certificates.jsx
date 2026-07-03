@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import api from '../utils/api';
+import api, { getFileUrl } from '../utils/api';
 import { Search, Award, FileText, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import SkeletonLoader from '../components/SkeletonLoader';
 
@@ -192,11 +192,7 @@ export default function Certificates() {
                       </div>
                     ) : (
                       <img
-                        src={
-                          cert.fileUrl.startsWith('/uploads')
-                            ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${cert.fileUrl}`
-                            : cert.fileUrl
-                        }
+                        src={getFileUrl(cert.fileUrl)}
                         alt={cert.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         loading="lazy"

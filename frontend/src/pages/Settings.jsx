@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import api from '../utils/api';
+import api, { getFileUrl } from '../utils/api';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Lock, Globe, Code, Briefcase, Upload, ShieldAlert, Loader2, Save } from 'lucide-react';
@@ -138,7 +138,7 @@ export default function Settings() {
                 <img src={URL.createObjectURL(file)} alt="Preview avatar" className="w-full h-full object-cover" />
               ) : user.profilePicture ? (
                 <img
-                  src={user.profilePicture.startsWith('/uploads') ? `${import.meta.env.VITE_API_URL || ''}${user.profilePicture}` : user.profilePicture}
+                  src={getFileUrl(user.profilePicture)}
                   alt={user.name}
                   className="w-full h-full object-cover"
                 />
