@@ -28,14 +28,29 @@ export const socketUrl = import.meta.env.DEV
 
 export const getFileUrl = (url) => {
   if (!url) return '';
-  const normalized = url.startsWith('/') ? url : '/' + url;
+  
+  // If it's a data URL, return it as-is
+  if (url.startsWith('data:')) return url;
+
   const backendUrl = import.meta.env.DEV 
     ? (import.meta.env.VITE_API_URL || 'http://localhost:5000') 
     : 'https://sanchay-store-your-all-certificates-here.onrender.com';
 
-  return normalized.startsWith('/uploads')
-    ? backendUrl + normalized
-    : url;
+  // If the URL contains '/uploads/' anywhere (handles full local development URLs in production database)
+  if (url.includes('/uploads/')) {
+    const uploadsIndex = url.indexOf('/uploads/');
+    const relativePath = url.substring(uploadsIndex); // extracts "/uploads/..."
+    return backendUrl + relativePath;
+  }
+
+  // If it's a full remote URL (Cloudinary, etc.)
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+
+  // Relative path fallback
+  const cleanUrl = url.startsWith('/') ? url : '/' + url;
+  return backendUrl + cleanUrl;
 };
 
 export default api;

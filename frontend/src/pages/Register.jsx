@@ -35,9 +35,8 @@ export default function Register() {
       });
 
       if (data.success) {
-        toast.success('Registration successful! Welcome to Yogyata.');
-        await checkAuth();
-        navigate('/dashboard');
+        toast.success(data.message || 'Registration successful! Please check your email to verify your account.', { duration: 8000 });
+        navigate('/login');
       }
     } catch (error) {
       const msg = error.response?.data?.message || 'Registration failed. Try again.';

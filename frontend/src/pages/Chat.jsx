@@ -79,6 +79,7 @@ export default function Chat() {
 
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [activeMediaUrl, setActiveMediaUrl] = useState(null);
+  const [mediaZoomed, setMediaZoomed] = useState(false);
 
   useEffect(() => {
     selectedUserRef.current = selectedUser;
@@ -184,8 +185,12 @@ export default function Chat() {
       }));
 
       if (activeChatType === 'direct' && activePartner && String(activePartner._id) === senderId) {
+        const wasAtBottom = isNearBottom();
         setMessages((prev) => [...prev, msg]);
         api.put(`/api/messages/${senderId}/read`).catch(() => {});
+        if (wasAtBottom) {
+          scrollToBottom('smooth');
+        }
       } else if (senderId !== String(currentUser._id)) {
         setUnreadCounts((prev) => ({ ...prev, [senderId]: (prev[senderId] || 0) + 1 }));
         const senderContact = contactsData?.find((c) => String(c._id) === senderId);
@@ -194,6 +199,7 @@ export default function Chat() {
         if (activeChatType === 'direct' && activePartner &&
           String(activePartner._id) === String(msg.recipient?._id || msg.recipient)) {
           setMessages((prev) => [...prev, msg]);
+          scrollToBottom('smooth');
         }
       }
     });
@@ -202,7 +208,11 @@ export default function Chat() {
       const activePartner = selectedUserRef.current;
       const activeChatType = chatTypeRef.current;
       if (activeChatType === 'group' && activePartner && activePartner.id === groupMsg.groupId) {
+        const wasAtBottom = isNearBottom();
         setMessages((prev) => [...prev, groupMsg]);
+        if (wasAtBottom) {
+          scrollToBottom('smooth');
+        }
       }
     });
 
@@ -232,7 +242,7 @@ export default function Chat() {
     });
 
     return () => newSocket.disconnect();
-  }, [currentUser]);
+  }, [currentUser, contactsData]);
 
   // Fetch message history
   useEffect(() => {
@@ -241,6 +251,7 @@ export default function Chat() {
       try {
         const res = await api.get(`/api/messages/${selectedUser._id}`);
         setMessages(res.data.messages);
+        scrollToBottom('auto');
         const history = res.data.messages;
         if (history.length > 0) {
           const last = history[history.length - 1];
@@ -265,22 +276,37 @@ export default function Chat() {
     socket.emit('join-group', selectedUser.id);
   }, [selectedUser, chatType, socket]);
 
+  const isNearBottom = useCallback(() => {
+    const container = chatContainerRef.current;
+    if (!container) return true;
+    return container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+  }, []);
+
   const scrollToBottom = useCallback((behavior = 'smooth') => {
-    if (chatBottomRef.current) {
-      chatBottomRef.current.scrollIntoView({ behavior, block: 'end' });
-    }
+    setTimeout(() => {
+      if (chatBottomRef.current) {
+        chatBottomRef.current.scrollIntoView({ behavior, block: 'end' });
+      }
+    }, 80);
   }, []);
 
   // Auto-scroll on message changes
   useEffect(() => {
     if (messages.length > 0) {
       const lastMsg = messages[messages.length - 1];
+      const isSelf = String(lastMsg.sender?._id || lastMsg.sender) === String(currentUser?._id);
       const isNewMessage = (Date.now() - new Date(lastMsg.createdAt).getTime()) < 6000;
-      scrollToBottom(isNewMessage ? 'smooth' : 'auto');
+      if (isNewMessage) {
+        if (isSelf || isNearBottom()) {
+          scrollToBottom('smooth');
+        }
+      } else {
+        scrollToBottom('auto');
+      }
     } else {
       scrollToBottom('auto');
     }
-  }, [messages, scrollToBottom]);
+  }, [messages, scrollToBottom, isNearBottom, currentUser]);
 
   // Scroll to bottom when typing status changes
   useEffect(() => {
@@ -876,12 +902,13 @@ export default function Chat() {
 
                             {/* Reaction picker on hover */}
                             {chatType === 'direct' && (
-                              <div className={`absolute top-0 ${isSelf ? '-left-32' : '-right-32'} opacity-0 group-hover/msg:opacity-100 transition-opacity duration-150 flex items-center bg-[#1a2332] border border-white/10 rounded-full px-2 py-1 shadow-xl z-20 gap-1.5`}>
-                                {EMOJI_REACTIONS.map((emoji) => (
+                              <div className={`absolute -top-9 ${isSelf ? 'right-0' : 'left-0'} opacity-0 scale-75 pointer-events-none group-hover/msg:opacity-100 group-hover/msg:scale-100 group-hover/msg:pointer-events-auto transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] flex items-center bg-[#1f2c34]/95 backdrop-blur-md border border-white/10 rounded-full px-2.5 py-1.5 shadow-2xl z-20 gap-2`}>
+                                {EMOJI_REACTIONS.map((emoji, emojiIdx) => (
                                   <button
                                     key={emoji}
                                     onClick={(e) => { e.stopPropagation(); handleReaction(msg._id, emoji); }}
-                                    className="hover:scale-125 transition-transform text-sm"
+                                    className="hover:scale-130 active:scale-95 transition-transform duration-200 text-sm filter hover:drop-shadow-lg"
+                                    style={{ transitionDelay: `${emojiIdx * 25}ms` }}
                                   >
                                     {emoji}
                                   </button>
@@ -981,18 +1008,21 @@ export default function Chat() {
                       <Download className="h-5 w-5" />
                     </a>
                     <button
-                      onClick={() => setActiveMediaUrl(null)}
+                      onClick={() => { setActiveMediaUrl(null); setMediaZoomed(false); }}
                       className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
                       title="Close"
                     >
                       <X className="h-5 w-5" />
                     </button>
                   </div>
-                  <div className="relative max-w-5xl max-h-[85vh] flex items-center justify-center overflow-hidden rounded-2xl border border-white/10 shadow-2xl p-2 bg-[#111827]/40 animate-float-up">
+                  <div 
+                    onClick={() => setMediaZoomed(!mediaZoomed)}
+                    className="relative max-w-5xl max-h-[85vh] flex items-center justify-center overflow-hidden rounded-2xl border border-white/10 shadow-2xl p-2 bg-[#111827]/40 animate-float-up cursor-zoom-in"
+                  >
                     <img
                       src={getFileUrl(activeMediaUrl)}
                       alt="Zoomed Media"
-                      className="max-w-full max-h-[80vh] object-contain rounded-xl"
+                      className={`max-w-full max-h-[80vh] object-contain rounded-xl transition-transform duration-300 ease-out ${mediaZoomed ? 'scale-150 cursor-zoom-out' : 'scale-100'}`}
                     />
                   </div>
                 </div>

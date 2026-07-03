@@ -74,8 +74,19 @@ const userSchema = new mongoose.Schema(
       enum: ['active', 'blocked'],
       default: 'active',
     },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+    verificationToken: {
+      type: String,
+    },
+    verificationTokenExpires: {
+      type: Date,
+    },
   },
   { timestamps: true }
 );
 
 module.exports = mongoose.model('User', userSchema);
+

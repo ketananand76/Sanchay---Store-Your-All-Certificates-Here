@@ -66,6 +66,7 @@ const {
   getUserCertificates,
   uploadUserCertificate,
   deleteUserCertificate,
+  verifyUser,
 } = require('./controllers/userPortalController');
 const { getJobs, createJob, applyJob, deleteJob } = require('./controllers/jobController');
 const {
@@ -99,6 +100,7 @@ app.get('/api/auth/me', protect, getMe);
 
 // 2. User Portal Auth & Vault routes
 app.post('/api/users/register', registerUser);
+app.get('/api/users/verify/:token', verifyUser);
 app.post('/api/users/login', loginUser);
 app.post('/api/users/logout', logoutUser);
 app.get('/api/users/me', protectUser, getMeUser);
