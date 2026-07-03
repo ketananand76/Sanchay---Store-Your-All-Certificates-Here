@@ -125,8 +125,8 @@ const getCertificateById = async (req, res, next) => {
       throw new Error('Certificate not found');
     }
 
-    // Security segregation: if user-owned, verify requester is the owner or admin
-    if (certificate.uploadedBy) {
+    // Security segregation: if user-owned and NOT approved, verify requester is the owner or admin
+    if (certificate.uploadedBy && certificate.status !== 'approved') {
       const jwt = require('jsonwebtoken');
       const Admin = require('../models/Admin');
       const token = req.cookies.token;

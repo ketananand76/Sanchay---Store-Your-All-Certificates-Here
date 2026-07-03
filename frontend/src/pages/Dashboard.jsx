@@ -518,7 +518,7 @@ export default function Dashboard() {
                         {/* Collapsible details row */}
                         {expandedUser === u._id && (
                           <tr>
-                            <td colSpan="5" className="bg-[#08070d]/90 px-8 py-5 border-b border-purple-950/40">
+                            <td colSpan="6" className="bg-[#08070d]/90 px-8 py-5 border-b border-purple-950/40">
                               {u.certificates.length === 0 ? (
                                 <p className="text-xs text-gray-500 italic">This user has not stored any credentials yet.</p>
                               ) : (

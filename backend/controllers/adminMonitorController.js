@@ -14,6 +14,8 @@ const getUsersAndCertificates = async (req, res, next) => {
           name: user.name,
           email: user.email,
           createdAt: user.createdAt,
+          followers: user.followers || [],
+          following: user.following || [],
           certificateCount: userCertificates.length,
           certificates: userCertificates,
         };
