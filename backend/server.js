@@ -78,7 +78,7 @@ const {
   getAllUsers,
   getUserProfile,
 } = require('./controllers/socialController');
-const { getChatMessages } = require('./controllers/messageController');
+const { getChatMessages, markAsRead, getUnreadCounts } = require('./controllers/messageController');
 const { getUsersAndCertificates, approveCertificate, rejectCertificate } = require('./controllers/adminMonitorController');
 const { protectUser } = require('./middleware/authMiddleware');
 
@@ -112,7 +112,9 @@ app.get('/api/social/users', protectUser, getAllUsers);
 app.get('/api/social/profile/:id', protectUser, getUserProfile);
 
 // 4. Message / Chat routes
+app.get('/api/messages/unread/counts', protectUser, getUnreadCounts);
 app.get('/api/messages/:userId', protectUser, getChatMessages);
+app.put('/api/messages/:userId/read', protectUser, markAsRead);
 
 // 5. Admin Monitoring routes
 app.get('/api/admin/users-monitor', protect, getUsersAndCertificates);

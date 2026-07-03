@@ -15,6 +15,7 @@ export default function Chat() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const [unreadCounts, setUnreadCounts] = useState({});
   
   // Call States
   const [callActive, setCallActive] = useState(false);
@@ -30,6 +31,42 @@ export default function Chat() {
       return res.data.users;
     },
   });
+
+  // Query/Effect: Fetch initial unread counts from backend
+  useEffect(() => {
+    const fetchUnreadCounts = async () => {
+      try {
+        const res = await api.get('/api/messages/unread/counts');
+        if (res.data.success) {
+          setUnreadCounts(res.data.counts || {});
+        }
+      } catch (err) {
+        console.error('Failed to load unread message counts:', err);
+      }
+    };
+    if (currentUser) {
+      fetchUnreadCounts();
+    }
+  }, [currentUser]);
+
+  // Effect: Mark messages as read when selecting a contact
+  useEffect(() => {
+    if (!selectedUser) return;
+
+    const markMessagesRead = async () => {
+      try {
+        await api.put(`/api/messages/${selectedUser._id}/read`);
+        setUnreadCounts((prev) => ({
+          ...prev,
+          [selectedUser._id]: 0,
+        }));
+      } catch (err) {
+        console.error('Failed to mark messages as read:', err);
+      }
+    };
+
+    markMessagesRead();
+  }, [selectedUser]);
 
   // Socket setup
   useEffect(() => {
@@ -47,17 +84,30 @@ export default function Chat() {
     });
 
     newSocket.on('receive-message', (msg) => {
+      const senderId = String(msg.sender?._id || msg.sender);
+      
       // If message is from the active chat partner, append to list
-      if (selectedUser && (msg.sender === selectedUser._id || msg.recipient === selectedUser._id)) {
+      if (selectedUser && String(selectedUser._id) === senderId) {
         setMessages((prev) => [...prev, msg]);
+        // Immediately mark as read on backend too
+        api.put(`/api/messages/${senderId}/read`).catch(() => {});
       } else {
-        // Show notification toast
-        toast(`New message from contact`, { icon: '💬' });
+        // Increment unread count for sender
+        if (senderId !== String(currentUser._id)) {
+          setUnreadCounts((prev) => ({
+            ...prev,
+            [senderId]: (prev[senderId] || 0) + 1,
+          }));
+          
+          // Dynamic notification toast
+          toast(`New message from contact`, { icon: '💬' });
+        } else {
+          // If we sent a message from another tab, append it
+          if (selectedUser && String(selectedUser._id) === String(msg.recipient?._id || msg.recipient)) {
+            setMessages((prev) => [...prev, msg]);
+          }
+        }
       }
-    });
-
-    newSocket.on('message-sent', (msg) => {
-      setMessages((prev) => [...prev, msg]);
     });
 
     // Handle Incoming Call signals
@@ -170,6 +220,12 @@ export default function Chat() {
                       <p className="text-[10px] text-gray-500 uppercase mt-0.5">{contact.role === 'seeker' ? 'Developer' : 'Employer'}</p>
                     </div>
                   </div>
+
+                  {unreadCounts[contact._id] > 0 && (
+                    <span className="bg-accent text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-lg shadow-purple-500/35">
+                      {unreadCounts[contact._id]}
+                    </span>
+                  )}
                 </button>
               ))
             )}
