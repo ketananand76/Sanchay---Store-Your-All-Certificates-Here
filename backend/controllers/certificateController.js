@@ -97,6 +97,7 @@ const getCertificates = async (req, res, next) => {
 
     const totalCertificates = await Certificate.countDocuments(query);
     const certificates = await Certificate.find(query)
+      .populate('uploadedBy', 'name email profilePicture')
       .sort(sortOptions)
       .skip(skipNum)
       .limit(limitNum);
@@ -118,7 +119,7 @@ const getCertificates = async (req, res, next) => {
 const getCertificateById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const certificate = await Certificate.findById(id);
+    const certificate = await Certificate.findById(id).populate('uploadedBy', 'name email profilePicture');
 
     if (!certificate) {
       res.status(404);
@@ -140,9 +141,11 @@ const getCertificateById = async (req, res, next) => {
           const isAdminExists = await Admin.findById(decoded.id);
           if (isAdminExists) {
             isAuthorized = true;
-          } else if (String(certificate.uploadedBy) === String(decoded.id)) {
-            // Check if standard user owner token
-            isAuthorized = true;
+          } else {
+            const ownerId = certificate.uploadedBy._id || certificate.uploadedBy;
+            if (String(ownerId) === String(decoded.id)) {
+              isAuthorized = true;
+            }
           }
         } catch (err) {
           // invalid token

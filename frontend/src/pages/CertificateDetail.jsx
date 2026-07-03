@@ -185,13 +185,15 @@ export default function CertificateDetail() {
                 </a>
               )}
 
-              <button
-                onClick={handleDownload}
-                className="w-full inline-flex items-center justify-center gap-2 border border-purple-800/40 hover:border-purple-500/50 bg-purple-950/20 hover:bg-purple-950/30 text-gray-200 hover:text-white font-semibold px-6 py-3 rounded-xl transition-all"
-              >
-                Download File
-                <Download className="h-4 w-4" />
-              </button>
+              {(isOwner || isAdmin) && (
+                <button
+                  onClick={handleDownload}
+                  className="w-full inline-flex items-center justify-center gap-2 border border-purple-800/40 hover:border-purple-500/50 bg-purple-950/20 hover:bg-purple-950/30 text-gray-200 hover:text-white font-semibold px-6 py-3 rounded-xl transition-all"
+                >
+                  Download File
+                  <Download className="h-4 w-4" />
+                </button>
+              )}
 
               {/* Secure Contextual Delete trigger */}
               {(isOwner || isAdmin) && (
