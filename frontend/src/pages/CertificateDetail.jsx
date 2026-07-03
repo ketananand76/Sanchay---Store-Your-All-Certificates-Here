@@ -1,8 +1,10 @@
 import React from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import api from '../utils/api';
-import { ArrowLeft, ExternalLink, Download, Calendar, ShieldCheck, Tag, FileText } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { ArrowLeft, ExternalLink, Download, Calendar, ShieldCheck, Tag, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const fetchCertificate = async (id) => {
   const { data } = await api.get(`/api/certificates/${id}`);
@@ -11,11 +13,40 @@ const fetchCertificate = async (id) => {
 
 export default function CertificateDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { user, admin } = useAuth();
 
   const { data: cert, isLoading, error } = useQuery({
     queryKey: ['certificateDetail', id],
     queryFn: () => fetchCertificate(id),
   });
+
+  const isAdmin = !!admin;
+  const isOwner = user && cert && (cert.uploadedBy === user._id || cert.uploadedBy?._id === user._id);
+
+  // Delete certificate mutation
+  const { mutate: deleteCert, isLoading: isDeleting } = useMutation({
+    mutationFn: async () => {
+      if (isAdmin) {
+        return api.delete(`/api/certificates/${id}`);
+      } else {
+        return api.delete(`/api/users/certificates/${id}`);
+      }
+    },
+    onSuccess: () => {
+      toast.success('Certificate deleted successfully');
+      navigate(isAdmin ? '/admin/dashboard' : '/dashboard');
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Delete operation failed');
+    },
+  });
+
+  const handleDelete = () => {
+    if (window.confirm('Are you sure you want to permanently delete this certificate?')) {
+      deleteCert();
+    }
+  };
 
   const getFullFileUrl = (url) => {
     if (!url) return '';
@@ -27,7 +58,6 @@ export default function CertificateDetail() {
 
   const handleDownload = () => {
     const fileUrl = getFullFileUrl(cert.fileUrl);
-    // Create a temporary link to download the file
     const link = document.createElement('a');
     link.href = fileUrl;
     link.download = `${cert.title.replace(/\s+/g, '_')}_Certificate`;
@@ -66,10 +96,10 @@ export default function CertificateDetail() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-screen relative z-10">
       <Link
-        to="/certificates"
+        to={isAdmin ? '/admin/dashboard' : (user ? '/dashboard' : '/certificates')}
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-purple-400 hover:text-white transition-colors mb-8"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to Gallery
+        <ArrowLeft className="h-4 w-4" /> Back to Dashboard
       </Link>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -155,6 +185,18 @@ export default function CertificateDetail() {
                 Download File
                 <Download className="h-4 w-4" />
               </button>
+
+              {/* Secure Contextual Delete trigger */}
+              {(isOwner || isAdmin) && (
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="w-full inline-flex items-center justify-center gap-2 border border-red-500/30 hover:border-red-500/50 bg-red-950/10 hover:bg-red-950/20 text-red-400 hover:text-red-300 font-semibold px-6 py-3 rounded-xl transition-all"
+                >
+                  {isDeleting ? 'Deleting Certificate...' : 'Delete Certificate'}
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
 
