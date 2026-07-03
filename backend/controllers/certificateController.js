@@ -8,7 +8,50 @@ const getCertificates = async (req, res, next) => {
   try {
     const { category, search, featured, sortBy, page = 1, limit = 12 } = req.query;
 
-    const query = { uploadedBy: null };
+    const jwt = require('jsonwebtoken');
+    const Admin = require('../models/Admin');
+    const token = req.cookies.token;
+    let currentUser = null;
+    let isAdmin = false;
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secretkey123');
+        const isAdminExists = await Admin.findById(decoded.id);
+        if (isAdminExists) {
+          isAdmin = true;
+        } else {
+          currentUser = decoded.id;
+        }
+      } catch (err) {
+        // invalid token
+      }
+    }
+
+    const query = {};
+    const conditions = [];
+
+    // Security context filtering:
+    if (!isAdmin) {
+      if (currentUser) {
+        // Logged-in standard user sees public admin certs OR their own certs
+        conditions.push({
+          $or: [
+            { uploadedBy: null },
+            { uploadedBy: { $exists: false } },
+            { uploadedBy: currentUser }
+          ]
+        });
+      } else {
+        // Guests see only public admin certs
+        conditions.push({
+          $or: [
+            { uploadedBy: null },
+            { uploadedBy: { $exists: false } }
+          ]
+        });
+      }
+    }
 
     if (category && category !== 'All') {
       query.category = category;
@@ -19,10 +62,16 @@ const getCertificates = async (req, res, next) => {
     }
 
     if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { issuer: { $regex: search, $options: 'i' } },
-      ];
+      conditions.push({
+        $or: [
+          { title: { $regex: search, $options: 'i' } },
+          { issuer: { $regex: search, $options: 'i' } },
+        ]
+      });
+    }
+
+    if (conditions.length > 0) {
+      query.$and = conditions;
     }
 
     // Sort options
