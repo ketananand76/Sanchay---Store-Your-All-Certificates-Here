@@ -172,11 +172,9 @@ io.on('connection', (socket) => {
         content,
       });
 
-      const recipientSocketId = userSockets[recipientId];
-      if (recipientSocketId) {
-        io.to(recipientSocketId).emit('receive-message', msg);
-      }
-      socket.emit('message-sent', msg);
+      // Broadcast to both participants' rooms for multi-tab sync
+      io.to(String(recipientId)).emit('receive-message', msg);
+      io.to(String(senderId)).emit('receive-message', msg);
     } catch (err) {
       console.error('Error saving message:', err);
     }
@@ -184,42 +182,30 @@ io.on('connection', (socket) => {
 
   // Video/Audio signaling
   socket.on('call-user', ({ callerId, recipientId, signalData, type, callerName }) => {
-    const recipientSocketId = userSockets[recipientId];
-    if (recipientSocketId) {
-      io.to(recipientSocketId).emit('incoming-call', {
-        callerId,
-        callerName,
-        signalData,
-        type,
-      });
-    }
+    io.to(String(recipientId)).emit('incoming-call', {
+      callerId,
+      callerName,
+      signalData,
+      type,
+    });
   });
 
   socket.on('answer-call', ({ callerId, recipientId, signalData }) => {
-    const callerSocketId = userSockets[callerId];
-    if (callerSocketId) {
-      io.to(callerSocketId).emit('call-accepted', {
-        recipientId,
-        signalData,
-      });
-    }
+    io.to(String(callerId)).emit('call-accepted', {
+      recipientId,
+      signalData,
+    });
   });
 
   socket.on('ice-candidate', ({ targetId, candidate, senderId }) => {
-    const targetSocketId = userSockets[targetId];
-    if (targetSocketId) {
-      io.to(targetSocketId).emit('ice-candidate', {
-        candidate,
-        senderId,
-      });
-    }
+    io.to(String(targetId)).emit('ice-candidate', {
+      candidate,
+      senderId,
+    });
   });
 
   socket.on('end-call', ({ targetId, senderId }) => {
-    const targetSocketId = userSockets[targetId];
-    if (targetSocketId) {
-      io.to(targetSocketId).emit('call-ended', { senderId });
-    }
+    io.to(String(targetId)).emit('call-ended', { senderId });
   });
 
   socket.on('disconnect', () => {

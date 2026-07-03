@@ -257,6 +257,18 @@ export default function UserProfile() {
                   <span className="absolute top-2.5 left-2.5 bg-[#0d0a15]/80 border border-purple-900/60 text-purple-300 text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">
                     {cert.category}
                   </span>
+
+                  {isSelf && (
+                    <span className={`absolute top-2.5 right-2.5 text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${
+                      cert.status === 'approved'
+                        ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                        : cert.status === 'rejected'
+                        ? 'bg-red-500/15 border-red-500/30 text-red-400'
+                        : 'bg-yellow-500/15 border-yellow-500/30 text-yellow-400'
+                    }`}>
+                      {cert.status || 'pending'}
+                    </span>
+                  )}
                 </div>
 
                 <div className="p-3">

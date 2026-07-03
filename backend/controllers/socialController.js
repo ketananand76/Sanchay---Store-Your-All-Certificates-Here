@@ -309,7 +309,37 @@ const getUserProfile = async (req, res, next) => {
       res.status(404);
       throw new Error('User profile not found');
     }
-    const certificates = await Certificate.find({ uploadedBy: user._id }).sort({ order: 1, dateIssued: -1 });
+
+    // Check if the current user is the owner or an admin
+    let showAll = false;
+    const jwt = require('jsonwebtoken');
+    const Admin = require('../models/Admin');
+    const token = req.cookies.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secretkey123');
+        if (decoded.id === String(user._id)) {
+          showAll = true;
+        } else {
+          const adminExists = await Admin.findById(decoded.id);
+          if (adminExists) {
+            showAll = true;
+          }
+        }
+      } catch (err) {}
+    }
+
+    // Alternate request context fallback
+    if (!showAll && req.user && String(req.user.id) === String(user._id)) {
+      showAll = true;
+    }
+
+    const certQuery = { uploadedBy: user._id };
+    if (!showAll) {
+      certQuery.status = 'approved';
+    }
+
+    const certificates = await Certificate.find(certQuery).sort({ order: 1, dateIssued: -1 });
     res.status(200).json({ success: true, user, certificates });
   } catch (error) {
     next(error);

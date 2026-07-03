@@ -1,15 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import api from '../utils/api';
+import api, { socketUrl } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { io } from 'socket.io-client';
 import { Send, MessageSquare, Phone, Video, ShieldCheck, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import CallModal from '../components/CallModal';
-
-const socketUrl = import.meta.env.DEV 
-  ? (import.meta.env.VITE_API_URL || 'http://localhost:5000') 
-  : window.location.origin;
 
 export default function Chat() {
   const { user: currentUser } = useAuth();
@@ -30,7 +26,7 @@ export default function Chat() {
   const { data: contactsData, isLoading: loadingContacts } = useQuery({
     queryKey: ['chatContacts'],
     queryFn: async () => {
-      const res = await api.get('/api/users');
+      const res = await api.get('/api/social/users');
       return res.data.users;
     },
   });
@@ -227,7 +223,7 @@ export default function Chat() {
                   <div className="text-center text-xs text-gray-600 py-12">No messages yet. Send a Swagat message!</div>
                 ) : (
                   messages.map((msg, index) => {
-                    const isSelf = msg.sender === currentUser._id;
+                    const isSelf = String(msg.sender?._id || msg.sender) === String(currentUser?._id);
                     return (
                       <div
                         key={msg._id || index}

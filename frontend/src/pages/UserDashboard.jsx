@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api, { getFileUrl } from '../utils/api';
+import api, { getFileUrl, socketUrl } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { Award, Plus, Trash2, ExternalLink, Calendar, FileText, Upload, Loader2, LogOut, ShieldCheck, ShieldAlert, Sparkles, CheckCircle2, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -8,10 +8,6 @@ import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 
 const categories = ['Development', 'Cloud', 'Security', 'Data Science', 'Academic', 'Design', 'Other'];
-
-const socketUrl = import.meta.env.DEV 
-  ? (import.meta.env.VITE_API_URL || 'http://localhost:5000') 
-  : window.location.origin;
 
 export default function UserDashboard() {
   const { user, loading, logout } = useAuth();

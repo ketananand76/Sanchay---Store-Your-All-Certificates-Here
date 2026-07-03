@@ -9,6 +9,10 @@ const api = axios.create({
   },
 });
 
+export const socketUrl = import.meta.env.DEV 
+  ? 'http://localhost:5000' 
+  : 'https://sanchay-store-your-all-certificates-here.onrender.com';
+
 export const getFileUrl = (url) => {
   if (!url) return '';
   return url.startsWith('/uploads')
