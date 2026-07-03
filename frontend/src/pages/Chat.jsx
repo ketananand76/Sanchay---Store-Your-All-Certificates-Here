@@ -46,6 +46,20 @@ export default function Chat() {
     },
   });
 
+  // Effect: Auto-select chat partner if user ID is in URL query parameters
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const userIdParam = params.get('user');
+    if (userIdParam && contactsData) {
+      const targetContact = contactsData.find((c) => String(c._id) === String(userIdParam));
+      if (targetContact) {
+        setSelectedUser(targetContact);
+        // Clear parameter from browser URL bar to avoid resetting selection on re-render
+        window.history.replaceState(null, '', '/chat');
+      }
+    }
+  }, [contactsData]);
+
   // Query/Effect: Fetch initial unread counts
   useEffect(() => {
     const fetchUnreadCounts = async () => {

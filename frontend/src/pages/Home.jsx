@@ -1,17 +1,25 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api, { getFileUrl } from '../utils/api';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Award, ArrowRight, ShieldCheck, FileText, ChevronRight, Heart, MessageCircle, Send, ExternalLink, Globe, Loader2 } from 'lucide-react';
+import api, { getFileUrl } from '../utils/api';
+import { 
+  ThumbsUp, MessageSquare, Share2, Send, ShieldCheck, Loader2, 
+  FileText, ArrowRight, Award, Plus, CheckCircle2, ExternalLink
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function Home() {
-  const { user, admin } = useAuth();
-  const navigate = useNavigate();
+  const { user, checkAuth } = useAuth();
   const queryClient = useQueryClient();
-  const [commentInputs, setCommentInputs] = useState({}); // { certId: 'text' }
-  const [expandedComments, setExpandedComments] = useState({}); // { certId: true }
+  const navigate = useNavigate();
+  
+  const [commentInputs, setCommentInputs] = useState({});
+  const [expandedComments, setExpandedComments] = useState({});
+
+  // ----------------------------------------------------
+  // QUERIES & MUTATIONS
+  // ----------------------------------------------------
 
   // Guest Spotlight query
   const { data: featuredData, isLoading: loadingFeatured } = useQuery({
@@ -29,6 +37,16 @@ export default function Home() {
     queryFn: async () => {
       const res = await api.get('/api/certificates');
       return res.data;
+    },
+    enabled: !!user,
+  });
+
+  // Fetch lobby users for sidebar follow recommendations
+  const { data: lobbyUsers, isLoading: loadingLobby } = useQuery({
+    queryKey: ['lobbyUsersHome'],
+    queryFn: async () => {
+      const res = await api.get('/api/social/users');
+      return res.data.users;
     },
     enabled: !!user,
   });
@@ -63,9 +81,26 @@ export default function Home() {
     },
   });
 
+  // Follow Mutation
+  const followMutation = useMutation({
+    mutationFn: async (userId) => {
+      const res = await api.post(`/api/social/follow/${userId}`);
+      return res.data;
+    },
+    onSuccess: (data) => {
+      toast.success(data.message);
+      queryClient.invalidateQueries({ queryKey: ['socialFeed'] });
+      queryClient.invalidateQueries({ queryKey: ['lobbyUsersHome'] });
+      checkAuth(); // Refresh logged-in user profile context for follow arrays
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Action failed');
+    },
+  });
+
   const handleLike = (id) => {
     if (!user) {
-      toast.error('Please login to like certificate posts');
+      toast.error('Please login to like posts');
       return navigate('/login');
     }
     likeMutation.mutate(id);
@@ -87,203 +122,370 @@ export default function Home() {
     setExpandedComments((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const handleShare = (postId) => {
+    const postUrl = `${window.location.origin}/certificates/${postId}`;
+    navigator.clipboard.writeText(postUrl);
+    toast.success('Link copied to clipboard!', { icon: '🔗' });
+  };
+
+  const handleSendToChat = (partnerId) => {
+    navigate(`/chat?user=${partnerId}`);
+  };
+
   // ----------------------------------------------------
-  // VIEW: LOGGED-IN SOCIAL FEED
+  // VIEW: LOGGED-IN LINKEDIN-STYLE SOCIAL FEED
   // ----------------------------------------------------
   if (user) {
     const feed = feedData?.certificates || [];
+    
+    // Filters recommendations (Lobby users whom you aren't following yet)
+    const recommendations = lobbyUsers?.filter(
+      (u) => String(u._id) !== String(user._id) && !user.following?.includes(u._id)
+    ).slice(0, 4) || [];
 
     return (
-      <div className="max-w-xl mx-auto px-4 py-8 min-h-screen relative z-10 space-y-6">
-        <div className="absolute top-[5%] left-[-15%] w-[40vw] h-[40vw] bg-accent/5 rounded-full blur-[100px] pointer-events-none"></div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen relative z-10">
+        <div className="absolute top-[5%] left-[-10%] w-[45vw] h-[45vw] bg-purple-900/5 rounded-full blur-[120px] pointer-events-none"></div>
 
-        {/* Feed Header */}
-        <div className="flex items-center justify-between border-b border-purple-950/20 pb-4">
-          <div>
-            <span className="text-[10px] text-indian-gold font-bold tracking-[0.2em] uppercase">Credential Stream</span>
-            <h1 className="font-accent text-xl font-bold text-white tracking-wide mt-0.5">Yogyata Social Feed</h1>
-          </div>
-          <Link
-            to="/search"
-            className="text-xs bg-purple-950/40 hover:bg-purple-900/40 text-purple-300 px-3.5 py-1.5 rounded-xl border border-purple-900/40 transition-colors"
-          >
-            Find Peers
-          </Link>
-        </div>
-
-        {loadingFeed ? (
-          <div className="py-20 flex justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-accent" />
-          </div>
-        ) : feed.length === 0 ? (
-          <div className="glass-panel p-16 rounded-2xl border-purple-950/20 text-center space-y-4">
-            <p className="text-gray-500 text-sm">Your feed is empty.</p>
-            <p className="text-xs text-gray-600 max-w-xs mx-auto">
-              Follow other developers to see their certifications here, or upload your own to populate the vault!
-            </p>
-            <Link
-              to="/search"
-              className="inline-flex bg-accent text-white font-bold px-4 py-2 rounded-xl text-xs"
-            >
-              Search Developers
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {feed.map((post) => {
-              const isLiked = post.likes?.includes(user._id);
-              const belongsToAdmin = !post.uploadedBy;
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          
+          {/* ========================================== */}
+          {/* LEFT SIDEBAR: PROFILE SUMMARY (3 columns)   */}
+          {/* ========================================== */}
+          <div className="lg:col-span-3 space-y-4">
+            <div className="glass-panel overflow-hidden rounded-2xl border-purple-950/45 bg-[#0c0a13]/85 shadow-xl">
+              {/* Decorative profile banner */}
+              <div className="h-16 bg-gradient-to-r from-accent/50 via-purple-900/30 to-accent-dark/50 relative"></div>
               
-              return (
-                <div
-                  key={post._id}
-                  className="bg-[#12111d]/50 border border-purple-950/40 rounded-2xl overflow-hidden shadow-2xl space-y-4"
-                >
-                  {/* Card Header (Owner profile detail) */}
-                  <div className="p-4 flex items-center justify-between bg-[#08070d]/30 border-b border-purple-950/20">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-purple-900/40 border border-purple-800/40 overflow-hidden flex items-center justify-center font-bold text-xs text-purple-300">
-                        {belongsToAdmin ? (
-                          <ShieldCheck className="h-4.5 w-4.5 text-indian-gold" />
-                        ) : post.uploadedBy.profilePicture ? (
-                          <img
-                            src={getFileUrl(post.uploadedBy.profilePicture)}
-                            alt={post.uploadedBy.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          post.uploadedBy.name?.charAt(0).toUpperCase()
-                        )}
-                      </div>
-                      <div>
-                        {belongsToAdmin ? (
-                          <span className="text-xs font-bold text-white flex items-center gap-1">
-                            Administrator <ShieldCheck className="h-3 w-3 text-indian-gold fill-current" />
-                          </span>
-                        ) : (
-                          <Link to={`/profile/${post.uploadedBy._id}`} className="text-xs font-bold text-white hover:text-accent hover:underline transition-colors">
-                            {post.uploadedBy.name}
-                          </Link>
-                        )}
-                        <span className="block text-[9px] text-gray-500 uppercase mt-0.5">{post.category}</span>
-                      </div>
-                    </div>
+              {/* Profile Summary info */}
+              <div className="px-5 pb-5 text-center -mt-8 relative z-10 space-y-4">
+                <div className="w-16 h-16 rounded-full bg-[#0c0a13] border-2 border-purple-900/50 mx-auto flex items-center justify-center font-bold text-lg text-purple-300 overflow-hidden shadow-lg">
+                  {user.profilePicture ? (
+                    <img src={getFileUrl(user.profilePicture)} alt={user.name} className="w-full h-full object-cover" />
+                  ) : (
+                    user.name.charAt(0).toUpperCase()
+                  )}
+                </div>
+                
+                <div>
+                  <h3 className="font-accent font-bold text-sm text-white hover:underline leading-tight">
+                    <Link to={`/profile/${user._id}`}>{user.name}</Link>
+                  </h3>
+                  <p className="text-[10px] text-gray-500 mt-1 uppercase font-semibold tracking-wider">
+                    {user.role === 'seeker' ? 'Developer Profile' : 'Employer Profile'}
+                  </p>
+                </div>
+
+                <div className="border-t border-purple-950/50 pt-4 flex justify-around text-xs text-gray-400">
+                  <div className="text-center flex-1">
+                    <span className="block font-bold text-white text-sm">{user.followers?.length || 0}</span>
+                    <span className="text-[8px] text-gray-500 uppercase tracking-widest font-semibold mt-0.5 block">Followers</span>
                   </div>
-
-                  {/* Document Display (Instagram post format) */}
-                  <div className="w-full bg-[#08070d] aspect-video relative flex items-center justify-center overflow-hidden border-b border-purple-950/20">
-                    {post.fileType === 'pdf' ? (
-                      <div className="flex flex-col items-center gap-2 text-purple-400/50">
-                        <FileText className="h-14 w-14" />
-                        <span className="text-[10px] uppercase tracking-wider font-semibold">PDF Certificate</span>
-                      </div>
-                    ) : (
-                      <img
-                        src={getFileUrl(post.fileUrl)}
-                        alt={post.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    )}
-                  </div>
-
-                  {/* Actions & Likes counts */}
-                  <div className="px-4 space-y-2">
-                    <div className="flex items-center gap-4">
-                      <button
-                        onClick={() => handleLike(post._id)}
-                        className={`hover:scale-110 transition-transform ${isLiked ? 'text-red-500' : 'text-gray-400 hover:text-white'}`}
-                      >
-                        <Heart className={`h-5.5 w-5.5 ${isLiked ? 'fill-current' : ''}`} />
-                      </button>
-                      <button
-                        onClick={() => toggleComments(post._id)}
-                        className="text-gray-400 hover:text-white hover:scale-110 transition-transform"
-                      >
-                        <MessageCircle className="h-5.5 w-5.5" />
-                      </button>
-                      <Link
-                        to={`/certificates/${post._id}`}
-                        className="text-gray-400 hover:text-white ml-auto hover:scale-110 transition-transform"
-                        title="Inspect PDF Details"
-                      >
-                        <ExternalLink className="h-5.5 w-5.5" />
-                      </Link>
-                    </div>
-
-                    <div className="text-xs font-bold text-white tracking-wide">
-                      {post.likes?.length || 0} Likes
-                    </div>
-                  </div>
-
-                  {/* Metadata and Description */}
-                  <div className="px-4 text-xs space-y-1">
-                    <p className="text-gray-200 leading-normal">
-                      <span className="font-bold text-white mr-1.5">{belongsToAdmin ? 'Admin' : post.uploadedBy.name}</span>
-                      {post.title} — Issued by <span className="text-purple-300 font-semibold">{post.issuer}</span>
-                    </p>
-                    {post.description && (
-                      <p className="text-gray-500 leading-relaxed text-[11px] whitespace-pre-wrap">{post.description}</p>
-                    )}
-                  </div>
-
-                  {/* Comments section */}
-                  <div className="px-4 border-t border-purple-950/10 pt-3 pb-4 space-y-3">
-                    {post.comments?.length > 0 && (
-                      <button
-                        onClick={() => toggleComments(post._id)}
-                        className="text-[10px] text-purple-400 font-semibold hover:underline"
-                      >
-                        {expandedComments[post._id]
-                          ? 'Hide all comments'
-                          : `View all ${post.comments.length} comments`}
-                      </button>
-                    )}
-
-                    {expandedComments[post._id] && post.comments?.length > 0 && (
-                      <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                        {post.comments.map((comment) => (
-                          <div key={comment._id} className="text-[11px] flex gap-2 items-start">
-                            <div className="w-5 h-5 rounded-full bg-purple-950 flex items-center justify-center text-[8px] font-bold text-purple-300 overflow-hidden shrink-0 border border-purple-900/30">
-                              {comment.userProfilePicture ? (
-                                <img src={comment.userProfilePicture} alt={comment.userName} className="w-full h-full object-cover" />
-                              ) : (
-                                comment.userName?.charAt(0).toUpperCase()
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <span className="font-bold text-white mr-1.5">{comment.userName}</span>
-                              <span className="text-gray-300">{comment.text}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Write comment input */}
-                    <form onSubmit={(e) => handleCommentSubmit(e, post._id)} className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Add comment..."
-                        value={commentInputs[post._id] || ''}
-                        onChange={(e) =>
-                          setCommentInputs((prev) => ({ ...prev, [post._id]: e.target.value }))
-                        }
-                        className="flex-1 bg-[#050409] border border-purple-950 text-gray-200 px-3 py-1.5 rounded-lg text-[11px] focus:outline-none focus:border-accent transition-all placeholder:text-gray-700"
-                      />
-                      <button
-                        type="submit"
-                        className="p-1.5 rounded-lg bg-accent/20 hover:bg-accent border border-accent/35 text-accent hover:text-white transition-colors"
-                      >
-                        <Send className="h-3 w-3" />
-                      </button>
-                    </form>
+                  <div className="w-px bg-purple-950/55 self-stretch"></div>
+                  <div className="text-center flex-1">
+                    <span className="block font-bold text-white text-sm">{user.following?.length || 0}</span>
+                    <span className="text-[8px] text-gray-500 uppercase tracking-widest font-semibold mt-0.5 block">Following</span>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            </div>
+
+            {/* Quick links shortcut panel */}
+            <div className="glass-panel p-4 rounded-2xl border-purple-950/45 bg-[#0c0a13]/85 text-xs space-y-2.5 hidden lg:block">
+              <Link to="/certificates" className="block text-gray-400 hover:text-white transition-colors">
+                My Vault
+              </Link>
+              <Link to="/chat" className="block text-gray-400 hover:text-white transition-colors">
+                Direct Messages
+              </Link>
+              <Link to="/search" className="block text-gray-400 hover:text-white transition-colors">
+                Explore Directory
+              </Link>
+            </div>
           </div>
-        )}
+
+          {/* ========================================== */}
+          {/* MIDDLE COLUMN: CREATOR BOX & STREAM (6 col) */}
+          {/* ========================================== */}
+          <div className="lg:col-span-6 space-y-5">
+            {/* Create Post trigger block */}
+            <div className="glass-panel p-4 rounded-2xl border-purple-950/45 bg-[#0c0a13]/85 shadow-lg flex items-center gap-3.5">
+              <div className="w-9 h-9 rounded-full bg-purple-950 border border-purple-900 flex items-center justify-center font-bold text-xs text-purple-300 overflow-hidden shrink-0">
+                {user.profilePicture ? (
+                  <img src={getFileUrl(user.profilePicture)} alt={user.name} className="w-full h-full object-cover" />
+                ) : (
+                  user.name.charAt(0).toUpperCase()
+                )}
+              </div>
+              <Link
+                to="/dashboard"
+                className="flex-1 bg-[#050409] border border-purple-950/70 hover:border-purple-800/40 text-left px-4 py-2.5 rounded-full text-xs text-gray-500 hover:text-gray-400 transition-colors font-semibold"
+              >
+                Share a new technology certification...
+              </Link>
+            </div>
+
+            {/* Social Feed List */}
+            {loadingFeed ? (
+              <div className="py-20 flex justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-accent" />
+              </div>
+            ) : feed.length === 0 ? (
+              <div className="glass-panel p-16 rounded-2xl border-purple-950/20 text-center space-y-4 bg-[#0c0a13]/40">
+                <p className="text-gray-500 text-sm">Your social stream is empty.</p>
+                <p className="text-xs text-gray-600 max-w-xs mx-auto">
+                  Follow developers in the right sidebar or find peers in the directory to see posts!
+                </p>
+                <Link
+                  to="/search"
+                  className="inline-flex bg-accent text-white font-bold px-4 py-2 rounded-xl text-xs hover:bg-accent-dark transition-all"
+                >
+                  Search Developers
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {feed.map((post) => {
+                  const isLiked = post.likes?.includes(user._id);
+                  const belongsToAdmin = !post.uploadedBy;
+                  const creatorId = post.uploadedBy?._id;
+                  const isSelfPost = creatorId === user._id;
+                  const followsCreator = user.following?.includes(creatorId);
+
+                  return (
+                    <div
+                      key={post._id}
+                      className="bg-[#100f1c]/70 border border-purple-950/45 rounded-2xl overflow-hidden shadow-xl"
+                    >
+                      {/* Post Header details */}
+                      <div className="p-4 flex items-center justify-between bg-[#08070d]/30 border-b border-purple-950/20">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-purple-900/40 border border-purple-800/40 overflow-hidden flex items-center justify-center font-bold text-xs text-purple-300 shrink-0">
+                            {belongsToAdmin ? (
+                              <ShieldCheck className="h-5 w-5 text-indian-gold" />
+                            ) : post.uploadedBy.profilePicture ? (
+                              <img
+                                src={getFileUrl(post.uploadedBy.profilePicture)}
+                                alt={post.uploadedBy.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              post.uploadedBy.name?.charAt(0).toUpperCase()
+                            )}
+                          </div>
+                          <div>
+                            {belongsToAdmin ? (
+                              <span className="text-xs font-bold text-white flex items-center gap-1">
+                                Administrator <ShieldCheck className="h-3.5 w-3.5 text-indian-gold fill-current" />
+                              </span>
+                            ) : (
+                              <Link to={`/profile/${creatorId}`} className="text-xs font-bold text-white hover:text-accent hover:underline transition-colors block leading-tight">
+                                {post.uploadedBy.name}
+                              </Link>
+                            )}
+                            <span className="block text-[9px] text-gray-500 uppercase mt-1 tracking-wider">{post.category}</span>
+                          </div>
+                        </div>
+
+                        {/* Follow trigger */}
+                        {!belongsToAdmin && !isSelfPost && (
+                          <button
+                            onClick={() => followMutation.mutate(creatorId)}
+                            disabled={followMutation.isLoading}
+                            className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${
+                              followsCreator
+                                ? 'bg-purple-950/20 border-purple-900/40 text-purple-400'
+                                : 'bg-accent/10 border-accent/30 text-accent hover:bg-accent/20'
+                            }`}
+                          >
+                            {followsCreator ? '✓ Following' : '+ Follow'}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Post Description and Content */}
+                      <div className="px-4 pt-3 text-xs space-y-3">
+                        <p className="text-gray-200 leading-relaxed font-semibold">
+                          {post.title} — Issued by <span className="text-purple-300 font-bold">{post.issuer}</span>
+                        </p>
+                        {post.description && (
+                          <p className="text-gray-400 leading-relaxed text-[11px] whitespace-pre-wrap">{post.description}</p>
+                        )}
+                      </div>
+
+                      {/* Visual Attachment frame (PDF / image preview) */}
+                      <div className="w-full bg-[#08070d] aspect-video relative flex items-center justify-center overflow-hidden border-y border-purple-950/20 mt-3">
+                        {post.fileType === 'pdf' ? (
+                          <div className="flex flex-col items-center gap-2 text-purple-400/40">
+                            <FileText className="h-12 w-12" />
+                            <span className="text-[9px] uppercase tracking-wider font-semibold">PDF Document Attachment</span>
+                          </div>
+                        ) : (
+                          <img
+                            src={getFileUrl(post.fileUrl)}
+                            alt={post.title}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        )}
+                        <Link
+                          to={`/certificates/${post._id}`}
+                          className="absolute bottom-3 right-3 p-2 bg-[#0d0a15]/80 hover:bg-[#161326] text-[10px] font-bold text-white border border-purple-900/60 rounded-xl transition-colors flex items-center gap-1"
+                        >
+                          Inspect Details <ExternalLink className="h-3 w-3" />
+                        </Link>
+                      </div>
+
+                      {/* Social counts details */}
+                      <div className="px-4 py-2.5 flex items-center justify-between text-[10px] text-gray-500 border-b border-purple-950/10">
+                        <span>{post.likes?.length || 0} Likes</span>
+                        <button onClick={() => toggleComments(post._id)} className="hover:underline">
+                          {post.comments?.length || 0} Comments
+                        </button>
+                      </div>
+
+                      {/* Actions toolbar */}
+                      <div className="px-2 py-1 flex items-center justify-around text-gray-400 text-xs">
+                        <button
+                          onClick={() => handleLike(post._id)}
+                          className={`flex-1 py-2 flex items-center justify-center gap-1.5 hover:bg-[#161427]/40 rounded-xl transition-colors ${
+                            isLiked ? 'text-accent font-bold' : ''
+                          }`}
+                        >
+                          <ThumbsUp className="h-4 w-4" />
+                          <span>Like</span>
+                        </button>
+                        
+                        <button
+                          onClick={() => toggleComments(post._id)}
+                          className="flex-1 py-2 flex items-center justify-center gap-1.5 hover:bg-[#161427]/40 rounded-xl transition-colors"
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                          <span>Comment</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleShare(post._id)}
+                          className="flex-1 py-2 flex items-center justify-center gap-1.5 hover:bg-[#161427]/40 rounded-xl transition-colors"
+                        >
+                          <Share2 className="h-4 w-4" />
+                          <span>Share</span>
+                        </button>
+
+                        {!belongsToAdmin && !isSelfPost && (
+                          <button
+                            onClick={() => handleSendToChat(creatorId)}
+                            className="flex-1 py-2 flex items-center justify-center gap-1.5 hover:bg-[#161427]/40 rounded-xl transition-colors"
+                          >
+                            <Send className="h-4 w-4" />
+                            <span>Send</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Comments block */}
+                      {expandedComments[post._id] && (
+                        <div className="px-4 pb-4 border-t border-purple-950/20 pt-3 space-y-3">
+                          {/* List of comments */}
+                          {post.comments?.length > 0 && (
+                            <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
+                              {post.comments.map((comment) => (
+                                <div key={comment._id} className="text-[11px] flex gap-2.5 items-start">
+                                  <div className="w-6.5 h-6.5 rounded-full bg-purple-950 flex items-center justify-center text-[9px] font-bold text-purple-300 overflow-hidden shrink-0 border border-purple-900/35">
+                                    {comment.userProfilePicture ? (
+                                      <img src={getFileUrl(comment.userProfilePicture)} alt={comment.userName} className="w-full h-full object-cover" />
+                                    ) : (
+                                      comment.userName?.charAt(0).toUpperCase()
+                                    )}
+                                  </div>
+                                  <div className="flex-1 bg-[#09080e]/40 p-2.5 rounded-xl border border-purple-950/30">
+                                    <div className="font-bold text-white text-[10px]">{comment.userName}</div>
+                                    <div className="text-gray-300 mt-0.5 leading-relaxed">{comment.text}</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Write Comment Form */}
+                          <form onSubmit={(e) => handleCommentSubmit(e, post._id)} className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="Write a professional comment..."
+                              value={commentInputs[post._id] || ''}
+                              onChange={(e) =>
+                                setCommentInputs((prev) => ({ ...prev, [post._id]: e.target.value }))
+                              }
+                              className="flex-1 bg-[#050409] border border-purple-950 text-gray-300 px-3.5 py-2 rounded-xl text-xs focus:outline-none focus:border-accent transition-all"
+                            />
+                            <button
+                              type="submit"
+                              className="bg-accent hover:bg-accent-dark text-white font-semibold text-xs px-4 py-2 rounded-xl transition-all"
+                            >
+                              Post
+                            </button>
+                          </form>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ========================================== */}
+          {/* RIGHT SIDEBAR: FOLLOW RECOMMENDATIONS (3 c) */}
+          {/* ========================================== */}
+          <div className="lg:col-span-3 space-y-4">
+            <div className="glass-panel p-4.5 rounded-2xl border-purple-950/45 bg-[#0c0a13]/85 shadow-xl space-y-4">
+              <div>
+                <h3 className="font-accent text-xs font-bold text-white uppercase tracking-wider">Add to your feed</h3>
+                <p className="text-[9px] text-gray-500 uppercase tracking-widest font-semibold mt-0.5">Suggested Developers</p>
+              </div>
+
+              {loadingLobby ? (
+                <div className="py-8 flex justify-center">
+                  <Loader2 className="h-5 w-5 animate-spin text-accent" />
+                </div>
+              ) : recommendations.length === 0 ? (
+                <p className="text-[10px] text-gray-500 italic">No recommendations. You follow all developers!</p>
+              ) : (
+                <div className="space-y-3.5">
+                  {recommendations.map((rec) => (
+                    <div key={rec._id} className="flex items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-purple-950 flex items-center justify-center font-bold text-xs text-purple-300 overflow-hidden shrink-0">
+                          {rec.profilePicture ? (
+                            <img src={getFileUrl(rec.profilePicture)} alt={rec.name} className="w-full h-full object-cover" />
+                          ) : (
+                            rec.name.charAt(0).toUpperCase()
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-xs font-bold text-white hover:underline truncate">
+                            <Link to={`/profile/${rec._id}`}>{rec.name}</Link>
+                          </h4>
+                          <span className="block text-[8px] text-gray-500 uppercase font-semibold mt-0.5 tracking-wider truncate">
+                            {rec.role === 'seeker' ? 'Developer' : 'Employer'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => followMutation.mutate(rec._id)}
+                        disabled={followMutation.isLoading}
+                        className="text-[10px] font-bold text-accent hover:text-white border border-accent/20 hover:bg-accent bg-accent/5 px-2.5 py-1 rounded-full transition-all shrink-0"
+                      >
+                        + Follow
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+        </div>
       </div>
     );
   }
@@ -323,7 +525,7 @@ export default function Home() {
               to="/certificates"
               className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-accent to-accent-dark hover:from-accent-dark hover:to-accent text-white font-semibold px-8 py-3.5 rounded-xl shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 hover:scale-[1.02] transition-all"
             >
-              Browse Full Gallery
+              Browse Full Vault
               <ArrowRight className="h-4 w-4" />
             </Link>
             <a
@@ -367,7 +569,7 @@ export default function Home() {
       </section>
 
       {/* Featured Certificates Section */}
-      <section id="featured" className="py-16 bg-[#08070d]/50 border-t border-purple-950/20 relative z-10">
+      <section id="featured" className="py-16 bg-[#08070d]/50 border-t border-purple-950/20 relative z-10 animate-fade-in">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-12 gap-4">
             <div>
@@ -380,71 +582,59 @@ export default function Home() {
             </div>
             <Link
               to="/certificates"
-              className="inline-flex items-center gap-1 text-sm font-semibold text-accent hover:text-purple-300 transition-colors group"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:text-white transition-colors"
             >
-              View all certificates
-              <ChevronRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+              View Full Catalog <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
 
           {loadingFeatured ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="h-32 bg-purple-950/10 rounded-2xl animate-pulse"></div>
-              <div className="h-32 bg-purple-950/10 rounded-2xl animate-pulse"></div>
-              <div className="h-32 bg-purple-950/10 rounded-2xl animate-pulse"></div>
+            <div className="py-20 flex justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-accent" />
             </div>
           ) : featuredData?.certificates?.length === 0 ? (
-            <div className="glass-panel rounded-2xl p-12 text-center text-gray-500 border-purple-950/20">
-              No featured certificates found. Admin can mark certificates as "featured" in the dashboard.
-            </div>
+            <p className="text-gray-500 text-xs italic text-center py-12">No spotlight certificates active currently.</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {featuredData?.certificates?.map((cert) => (
-                <div
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {featuredData.certificates.map((cert) => (
+                <Link
                   key={cert._id}
-                  className="group relative flex flex-col bg-[#12111d]/60 rounded-2xl border border-purple-950/50 hover:border-purple-800/40 hover:bg-[#151425] shadow-xl hover:shadow-purple-500/5 hover:-translate-y-1 transition-all overflow-hidden"
+                  to={`/certificates/${cert._id}`}
+                  className="group bg-[#12111d]/40 rounded-2xl border border-purple-950/40 overflow-hidden hover:border-purple-800/50 hover:bg-[#16152a]/70 hover:-translate-y-1 transition-all flex flex-col h-full shadow-lg"
                 >
-                  <div className="w-full h-48 bg-[#09080e] relative overflow-hidden flex items-center justify-center border-b border-purple-950/30">
+                  <div className="aspect-video relative bg-[#09080e] overflow-hidden flex items-center justify-center border-b border-purple-950/20">
                     {cert.fileType === 'pdf' ? (
-                      <div className="flex flex-col items-center gap-2 text-purple-400/70 group-hover:text-purple-300 transition-colors">
-                        <FileText className="h-12 w-12" />
-                        <span className="text-xs uppercase tracking-wider font-semibold">PDF Document</span>
+                      <div className="flex flex-col items-center gap-2 text-purple-400/30">
+                        <FileText className="h-10 w-10" />
+                        <span className="text-[9px] uppercase tracking-widest font-semibold">PDF View</span>
                       </div>
                     ) : (
                       <img
                         src={getFileUrl(cert.fileUrl)}
                         alt={cert.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
                         loading="lazy"
                       />
                     )}
-                    <span className="absolute top-3 left-3 bg-[#0d0a15]/80 backdrop-blur border border-purple-900/60 text-purple-300 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md">
-                      {cert.category}
-                    </span>
                   </div>
-
-                  <div className="p-5 flex-1 flex flex-col">
-                    <span className="text-xs text-gray-500">
-                      {new Date(cert.dateIssued).toLocaleDateString('en-IN', {
-                        year: 'numeric',
-                        month: 'long',
-                      })}
-                    </span>
-                    <h3 className="font-accent text-lg font-bold text-white mt-1 group-hover:text-accent transition-colors">
-                      {cert.title}
-                    </h3>
-                    <p className="text-sm text-gray-400 mt-1">{cert.issuer}</p>
-
-                    <div className="flex gap-2.5 mt-6 pt-4 border-t border-purple-950/30">
-                      <Link
-                        to={`/certificates/${cert._id}`}
-                        className="flex-1 inline-flex items-center justify-center text-xs font-semibold bg-purple-950/30 hover:bg-purple-900/40 text-purple-200 border border-purple-900/40 py-2 rounded-lg transition-colors"
-                      >
-                        Inspect details
-                      </Link>
+                  <div className="p-5 flex-1 flex flex-col justify-between">
+                    <div>
+                      <span className="text-[8px] bg-purple-950/45 text-purple-300 font-bold uppercase tracking-wider px-2 py-0.5 rounded border border-purple-900/40">
+                        {cert.category}
+                      </span>
+                      <h3 className="font-accent text-sm font-bold text-white mt-3 leading-tight group-hover:text-accent transition-colors">
+                        {cert.title}
+                      </h3>
+                      <p className="text-[10px] text-gray-500 mt-1">Issued by {cert.issuer}</p>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-purple-950/20 pt-4 mt-4 text-[10px] text-gray-400">
+                      <span>{new Date(cert.dateIssued).toLocaleDateString('en-IN', { year: 'numeric', month: 'short' })}</span>
+                      <span className="text-indian-gold font-semibold group-hover:underline flex items-center gap-1">
+                        Verify Record <ExternalLink className="h-3 w-3" />
+                      </span>
                     </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
