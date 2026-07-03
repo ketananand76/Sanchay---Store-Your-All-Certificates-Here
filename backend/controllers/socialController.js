@@ -346,6 +346,42 @@ const getUserProfile = async (req, res, next) => {
   }
 };
 
+const blockUserAndAlert = async (userId, reason) => {
+  try {
+    const Alert = require('../models/Alert');
+    const user = await User.findById(userId);
+    if (user) {
+      user.status = 'blocked';
+      await user.save();
+
+      const alert = await Alert.create({
+        userId: user._id,
+        userName: user.name,
+        userEmail: user.email,
+        reason: reason,
+      });
+      return alert;
+    }
+  } catch (err) {
+    console.error('Failed to auto-block user:', err);
+  }
+  return null;
+};
+
+const reportAbusiveLanguage = async (req, res, next) => {
+  try {
+    const alert = await blockUserAndAlert(req.user.id, req.body.reason || 'Abusive word usage detected during WebRTC call session.');
+    
+    res.status(200).json({
+      success: true,
+      message: 'Violation recorded. Your account has been automatically blocked.',
+      alert,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   toggleFollow,
   searchUsers,
@@ -356,4 +392,6 @@ module.exports = {
   deleteAccount,
   getAllUsers,
   getUserProfile,
+  blockUserAndAlert,
+  reportAbusiveLanguage,
 };

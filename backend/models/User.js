@@ -60,6 +60,11 @@ const userSchema = new mongoose.Schema(
       type: Object,
       default: null,
     },
+    status: {
+      type: String,
+      enum: ['active', 'blocked'],
+      default: 'active',
+    },
   },
   { timestamps: true }
 );

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { PhoneOff, PhoneCall, Video, VideoOff, Volume2, VolumeX } from 'lucide-react';
 import toast from 'react-hot-toast';
+import api from '../utils/api';
 
 const pcConfig = {
   iceServers: [
@@ -8,6 +9,12 @@ const pcConfig = {
     { urls: 'stun:stun1.l.google.com:19302' },
   ],
 };
+
+const ABUSIVE_WORDS = [
+  'fuck', 'shit', 'asshole', 'bitch', 'bastard', 'cunt', 'dick', 'pussy', 'slut', 'whore',
+  'chutiya', 'madarchod', 'behenchod', 'gandu', 'bhosdike', 'harami', 'saala', 'kamina',
+  'चूतिया', 'मादरचोद', 'बहनचोद', 'गांडू', 'भोसड़ीके', 'हरामी', 'साला', 'कमीना'
+];
 
 export default function CallModal({ socket, callInfo, onClose }) {
   const { callerId, callerName, recipientId, type, signalData, direction } = callInfo;
@@ -22,6 +29,77 @@ export default function CallModal({ socket, callInfo, onClose }) {
   const remoteVideoRef = useRef(null);
   const pcRef = useRef(null);
   const candidatesQueue = useRef([]);
+  const recognitionRef = useRef(null);
+
+  // Initialize HTML5 Speech Recognition for Voice Moderation
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const rec = new SpeechRecognition();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = 'hi-IN'; // Listens to both Hindi and English speech structures
+
+      rec.onresult = async (event) => {
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            const transcript = event.results[i][0].transcript.toLowerCase();
+            console.log('[Voice Moderation Transcript]:', transcript);
+
+            // Strip basic punctuation and verify against bad words dictionary
+            const words = transcript.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"").split(/\s+/);
+            const hasAbusive = words.some(word => 
+              ABUSIVE_WORDS.includes(word) || ABUSIVE_WORDS.some(bad => word.includes(bad))
+            );
+
+            if (hasAbusive) {
+              rec.stop();
+              toast.error('Violation: Abusive speech detected! Terminating call and auto-blocking account.', { duration: 6000 });
+              
+              // Call report API to trigger backend block
+              try {
+                await api.post('/api/social/report-abusive', {
+                  reason: `Automated block: Abusive speech detected during call session: "${transcript}"`
+                });
+              } catch (err) {}
+
+              // Terminate call signaling and force logout redirect
+              declineCall();
+              window.location.href = '/login';
+            }
+          }
+        }
+      };
+
+      rec.onerror = (e) => {
+        if (e.error === 'no-speech' || e.error === 'aborted') {
+          // Restart transient/no-speech errors to keep listening active
+          try { rec.start(); } catch (err) {}
+        }
+      };
+
+      rec.onend = () => {
+        // Keep speech recognition running as long as the call remains connected
+        if (pcRef.current && pcRef.current.connectionState === 'connected') {
+          try { rec.start(); } catch (err) {}
+        }
+      };
+
+      recognitionRef.current = rec;
+    }
+  }, [callState]);
+
+  // Start speech recognition once WebRTC is connected
+  useEffect(() => {
+    if (callState === 'connected' && recognitionRef.current) {
+      try {
+        recognitionRef.current.start();
+        console.log('[Voice Moderation] Speech recognition listening active.');
+      } catch (err) {
+        console.error('Speech recognition start failed:', err);
+      }
+    }
+  }, [callState]);
 
   useEffect(() => {
     // Socket listeners for signaling
@@ -73,6 +151,11 @@ export default function CallModal({ socket, callInfo, onClose }) {
   }, []);
 
   const cleanup = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (err) {}
+    }
     if (localStream) {
       localStream.getTracks().forEach((track) => track.stop());
     }

@@ -9,6 +9,19 @@ const api = axios.create({
   },
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 403) {
+      const msg = error.response.data?.message || '';
+      if (msg.includes('blocked') || msg.includes('moderation')) {
+        window.location.href = '/login?error=' + encodeURIComponent(msg);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const socketUrl = import.meta.env.DEV 
   ? 'http://localhost:5000' 
   : 'https://sanchay-store-your-all-certificates-here.onrender.com';

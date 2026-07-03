@@ -19,7 +19,7 @@ const GROUP_CHANNELS = [
 ];
 
 export default function Chat() {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, logout } = useAuth();
   
   // Navigation Tabs: 'chats' | 'status' | 'groups' | 'calls'
   const [activeTab, setActiveTab] = useState('chats');
@@ -241,6 +241,13 @@ export default function Chat() {
         direction: 'inbound',
       });
       setCallActive(true);
+    });
+
+    newSocket.on('blocked-user', ({ message }) => {
+      toast.error(message, { duration: 8000 });
+      logout().then(() => {
+        window.location.href = '/login';
+      });
     });
 
     return () => {

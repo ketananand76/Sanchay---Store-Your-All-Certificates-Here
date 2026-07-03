@@ -84,6 +84,11 @@ const loginUser = async (req, res, next) => {
       throw new Error('Invalid email or password');
     }
 
+    if (user.status === 'blocked') {
+      res.status(403);
+      throw new Error('Your account has been automatically blocked for violating moderation guidelines.');
+    }
+
     setTokenCookie(res, user._id);
 
     res.status(200).json({

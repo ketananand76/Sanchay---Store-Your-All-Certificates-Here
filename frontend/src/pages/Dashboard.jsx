@@ -1,45 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import api, { getFileUrl } from '../utils/api';
+import api, { getFileUrl, socketUrl } from '../utils/api';
+import { io } from 'socket.io-client';
 import { 
   Plus, Edit2, Trash2, Star, ChevronLeft, ChevronRight, Loader2, Award, 
   Search, ExternalLink, Folder, FolderOpen, ShieldCheck, Check, X, 
-  ShieldAlert, Users, Clock, CheckCircle2, ArrowLeft, RefreshCw 
+  ShieldAlert, Users, Clock, CheckCircle2, ArrowLeft, RefreshCw, AlertTriangle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
   
-  // Tab states
-  const [activeTab, setActiveTab] = useState('folders'); // 'folders', 'approvals', 'inventory'
+  // Tab states: 'folders' | 'approvals' | 'alerts'
+  const [activeTab, setActiveTab] = useState('folders');
   const [folderSearch, setFolderSearch] = useState('');
   const [selectedFolderUser, setSelectedFolderUser] = useState(null);
-
-  // Certificate Pagination & Filters (for Master Inventory tab)
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const limit = 8;
-
-  // Query: admin certificates (Master Inventory)
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['adminCertificates', page, search],
-    queryFn: async () => {
-      const params = { page, limit, sortBy: 'order_asc' };
-      if (search) params.search = search;
-      const res = await api.get('/api/certificates', { params });
-      return res.data;
-    },
-    keepPreviousData: true,
-  });
 
   // Query: registered users monitor (Folders View)
   const { data: monitorData, isLoading: loadingMonitor, error: monitorError } = useQuery({
     queryKey: ['adminUsersMonitor'],
     queryFn: async () => {
       const res = await api.get('/api/admin/users-monitor');
-      return res.data;
+      return res.data.users;
     },
   });
 
@@ -52,36 +36,40 @@ export default function Dashboard() {
     },
   });
 
-  // Toggle Pinned Spotlight Status Mutation
-  const toggleFeaturedMutation = useMutation({
-    mutationFn: async ({ id, featured }) => {
-      const res = await api.put(`/api/certificates/${id}`, { featured });
-      return res.data;
-    },
-    onSuccess: () => {
-      toast.success('Spotlight status updated');
-      queryClient.invalidateQueries({ queryKey: ['adminCertificates'] });
-      queryClient.invalidateQueries({ queryKey: ['featuredCertificates'] });
-    },
-    onError: (err) => {
-      toast.error(err.response?.data?.message || 'Update failed');
+  // Query: moderation alerts
+  const { data: alertsData, isLoading: loadingAlerts, error: alertsError } = useQuery({
+    queryKey: ['adminAlerts'],
+    queryFn: async () => {
+      const res = await api.get('/api/admin/alerts');
+      return res.data.alerts;
     },
   });
 
-  // Order sorting Mutation
-  const updateOrderMutation = useMutation({
-    mutationFn: async ({ id, order }) => {
-      const res = await api.put(`/api/certificates/${id}`, { order });
-      return res.data;
-    },
-    onSuccess: () => {
-      toast.success('Certificate order updated');
-      queryClient.invalidateQueries({ queryKey: ['adminCertificates'] });
-    },
-    onError: (err) => {
-      toast.error(err.response?.data?.message || 'Reorder failed');
-    },
-  });
+  // WebSocket Live alerts listener
+  useEffect(() => {
+    const socket = io(socketUrl);
+
+    socket.on('connect', () => {
+      // Register this socket session to the admin room
+      socket.emit('register-admin');
+    });
+
+    socket.on('admin-alert-created', (alert) => {
+      // Trigger native red alert toast notification
+      toast.error(
+        `🚨 WARNING: Auto-blocked "${alert.userName}" (${alert.userEmail}) for: ${alert.reason}`, 
+        { duration: 10000, icon: '⚠️' }
+      );
+      
+      // Invalidate queries to refresh the views
+      queryClient.invalidateQueries({ queryKey: ['adminAlerts'] });
+      queryClient.invalidateQueries({ queryKey: ['adminUsersMonitor'] });
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [queryClient]);
 
   // Delete Mutation
   const deleteMutation = useMutation({
@@ -91,12 +79,8 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       toast.success('Certificate deleted successfully');
-      queryClient.invalidateQueries({ queryKey: ['adminCertificates'] });
-      queryClient.invalidateQueries({ queryKey: ['featuredCertificates'] });
       queryClient.invalidateQueries({ queryKey: ['pendingCertificates'] });
       queryClient.invalidateQueries({ queryKey: ['adminUsersMonitor'] });
-      
-      // Update selected folder if open
       if (selectedFolderUser) {
         queryClient.refetchQueries({ queryKey: ['adminUsersMonitor'] });
       }
@@ -115,7 +99,6 @@ export default function Dashboard() {
     onSuccess: () => {
       toast.success('Certificate approved successfully!');
       queryClient.invalidateQueries({ queryKey: ['pendingCertificates'] });
-      queryClient.invalidateQueries({ queryKey: ['adminCertificates'] });
       queryClient.invalidateQueries({ queryKey: ['adminUsersMonitor'] });
     },
     onError: (err) => {
@@ -132,11 +115,41 @@ export default function Dashboard() {
     onSuccess: () => {
       toast.success('Certificate rejected successfully');
       queryClient.invalidateQueries({ queryKey: ['pendingCertificates'] });
-      queryClient.invalidateQueries({ queryKey: ['adminCertificates'] });
       queryClient.invalidateQueries({ queryKey: ['adminUsersMonitor'] });
     },
     onError: (err) => {
       toast.error(err.response?.data?.message || 'Rejection failed');
+    },
+  });
+
+  // Mutation: Dismiss Alert
+  const dismissAlertMutation = useMutation({
+    mutationFn: async (alertId) => {
+      const res = await api.delete(`/api/admin/alerts/${alertId}`);
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success('Security alert cleared');
+      queryClient.invalidateQueries({ queryKey: ['adminAlerts'] });
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Clear failed');
+    },
+  });
+
+  // Mutation: Unblock User
+  const unblockMutation = useMutation({
+    mutationFn: async (userId) => {
+      const res = await api.put(`/api/admin/users/${userId}/unblock`);
+      return res.data;
+    },
+    onSuccess: (data) => {
+      toast.success(data.message || 'User account unblocked successfully!');
+      queryClient.invalidateQueries({ queryKey: ['adminAlerts'] });
+      queryClient.invalidateQueries({ queryKey: ['adminUsersMonitor'] });
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Unblock failed');
     },
   });
 
@@ -146,20 +159,15 @@ export default function Dashboard() {
     }
   };
 
-  const handleOrderChange = (id, currentOrder, change) => {
-    const newOrder = currentOrder + change;
-    updateOrderMutation.mutate({ id, order: newOrder });
-  };
-
   // Filter folder directory users by search
-  const filteredUsers = monitorData?.users?.filter(u => 
+  const filteredUsers = monitorData?.filter(u => 
     u.name.toLowerCase().includes(folderSearch.toLowerCase()) || 
     u.email.toLowerCase().includes(folderSearch.toLowerCase())
   ) || [];
 
   // Get active folder user statistics/certificates if selected
   const activeFolderUser = selectedFolderUser
-    ? monitorData?.users?.find(u => String(u._id) === String(selectedFolderUser._id))
+    ? monitorData?.find(u => String(u._id) === String(selectedFolderUser._id))
     : null;
 
   return (
@@ -194,7 +202,7 @@ export default function Dashboard() {
           </div>
           <div>
             <span className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Total Users</span>
-            <h3 className="text-2xl font-bold text-white mt-0.5">{monitorData?.count || 0}</h3>
+            <h3 className="text-2xl font-bold text-white mt-0.5">{monitorData?.length || 0}</h3>
           </div>
         </div>
 
@@ -214,15 +222,19 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="glass-panel p-5 rounded-2xl border-purple-950/40 flex items-center gap-4 bg-[#0c0a13]/40">
-          <div className="p-3 bg-purple-950/40 rounded-xl border border-purple-900/30 text-emerald-400">
-            <CheckCircle2 className="h-6 w-6" />
+        <div className={`glass-panel p-5 rounded-2xl border-purple-950/40 flex items-center gap-4 bg-[#0c0a13]/40 ${
+          alertsData?.length > 0 ? 'ring-1 ring-red-500/25 border-red-500/40' : ''
+        }`}>
+          <div className={`p-3 rounded-xl border ${
+            alertsData?.length > 0
+              ? 'bg-red-500/10 border-red-500/35 text-red-400 animate-pulse'
+              : 'bg-purple-950/40 border-purple-900/30 text-gray-400'
+          }`}>
+            <AlertTriangle className="h-6 w-6" />
           </div>
           <div>
-            <span className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Live Feed Posts</span>
-            <h3 className="text-2xl font-bold text-white mt-0.5">
-              {(data?.totalCount || 0) - (pendingData?.certificates?.length || 0)}
-            </h3>
+            <span className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Security Alerts</span>
+            <h3 className="text-2xl font-bold text-white mt-0.5">{alertsData?.length || 0}</h3>
           </div>
         </div>
 
@@ -233,7 +245,7 @@ export default function Dashboard() {
           <div>
             <span className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Console Security</span>
             <h3 className="text-[11px] text-indian-emerald font-bold uppercase tracking-wider mt-1.5 flex items-center gap-1">
-              ● Active SSL Tunnel
+              ● Speech Moderation Active
             </h3>
           </div>
         </div>
@@ -249,7 +261,7 @@ export default function Dashboard() {
               : 'border-transparent text-gray-500 hover:text-gray-300'
           }`}
         >
-          📁 User Directories ({monitorData?.count || 0})
+          📁 User Directories ({monitorData?.length || 0})
         </button>
         <button
           onClick={() => { setSelectedFolderUser(null); setActiveTab('approvals'); }}
@@ -261,7 +273,21 @@ export default function Dashboard() {
         >
           📥 Action Queue ({pendingData?.certificates?.length || 0})
         </button>
-
+        <button
+          onClick={() => { setSelectedFolderUser(null); setActiveTab('alerts'); }}
+          className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all flex items-center justify-center gap-1.5 ${
+            activeTab === 'alerts'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-gray-500 hover:text-gray-300'
+          }`}
+        >
+          <span>⚠️ Alerts</span>
+          {alertsData?.length > 0 && (
+            <span className="bg-red-650 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+              {alertsData.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* ========================================== */}
@@ -308,7 +334,7 @@ export default function Dashboard() {
                         onClick={() => setSelectedFolderUser(u)}
                         className="group relative flex flex-col bg-[#12111d]/50 rounded-2xl border border-purple-950/40 hover:border-purple-800/50 hover:bg-[#16152a]/70 p-5 shadow-xl hover:-translate-y-1 transition-all text-left w-full focus:outline-none"
                       >
-                        {/* Golden/Indian-Gold Folder Icon */}
+                        {/* Folder Icon */}
                         <div className="flex items-start justify-between">
                           <div className="text-indian-gold group-hover:scale-105 transition-transform duration-300">
                             <Folder className="h-12 w-12 fill-current opacity-70 group-hover:opacity-90" />
@@ -387,7 +413,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Certificates contained inside the folder (Approve/Reject actions remain after approval!) */}
+              {/* Certificates contained inside the folder */}
               {!activeFolderUser || activeFolderUser.certificates.length === 0 ? (
                 <div className="glass-panel p-16 text-center text-gray-500 border-purple-950/20">
                   Folder is empty. No certificates uploaded yet.
@@ -446,7 +472,7 @@ export default function Dashboard() {
                               <a
                                 href={getFileUrl(cert.fileUrl)}
                                 target="_blank"
-                                  rel="noopener noreferrer"
+                                rel="noopener noreferrer"
                                 className="inline-flex items-center justify-center text-xs font-semibold bg-purple-950/30 hover:bg-purple-900/40 text-purple-300 border border-purple-900/40 px-3 py-1.5 rounded-lg transition-colors mr-2"
                               >
                                 View
@@ -591,6 +617,71 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* ========================================== */}
+      {/* ⚠️ TAB: MODERATION ALERTS                  */}
+      {/* ========================================== */}
+      {activeTab === 'alerts' && (
+        <div className="space-y-6">
+          {loadingAlerts ? (
+            <div className="glass-panel rounded-2xl p-16 flex items-center justify-center border-purple-950/40">
+              <Loader2 className="h-8 w-8 animate-spin text-accent" />
+            </div>
+          ) : alertsError ? (
+            <div className="glass-panel rounded-2xl p-12 text-center text-red-400 border-red-950/50">
+              Failed to load security alerts database.
+            </div>
+          ) : !alertsData || alertsData.length === 0 ? (
+            <div className="glass-panel rounded-2xl p-16 text-center text-gray-500 border-purple-950/20 bg-[#0c0a13]/40">
+              No active security violations or warnings registered.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {alertsData.map((alert) => (
+                <div 
+                  key={alert._id} 
+                  className="glass-panel p-5 rounded-2xl border-red-950/50 bg-[#140b10]/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl"
+                >
+                  <div className="space-y-2 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-red-500/20 border border-red-500/40 text-red-400 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                        Auto-Blocked
+                      </span>
+                      <span className="text-[10px] text-gray-500 font-mono">
+                        {new Date(alert.createdAt).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                    
+                    <h3 className="font-accent text-sm font-bold text-white truncate">
+                      {alert.userName} <span className="text-xs text-gray-500 font-normal">({alert.userEmail})</span>
+                    </h3>
+                    
+                    <p className="text-xs text-red-300 italic leading-relaxed break-words bg-[#080305]/60 p-3 rounded-xl border border-red-950/20 font-medium">
+                      "{alert.reason}"
+                    </p>
+                  </div>
+
+                  <div className="flex sm:flex-col gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0">
+                    <button
+                      onClick={() => unblockMutation.mutate(alert.userId)}
+                      disabled={unblockMutation.isLoading}
+                      className="flex-1 sm:w-32 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+                    >
+                      Unblock User
+                    </button>
+                    <button
+                      onClick={() => dismissAlertMutation.mutate(alert._id)}
+                      disabled={dismissAlertMutation.isLoading}
+                      className="flex-1 sm:w-32 bg-[#2a1113]/55 hover:bg-[#3d1519] border border-red-900/35 text-red-400 text-xs font-bold px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+                    >
+                      Clear Log
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
     </div>
   );

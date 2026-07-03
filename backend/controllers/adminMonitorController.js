@@ -98,8 +98,48 @@ const rejectCertificate = async (req, res, next) => {
   }
 };
 
+const Alert = require('../models/Alert');
+
+const getAdminAlerts = async (req, res, next) => {
+  try {
+    const alerts = await Alert.find().sort({ createdAt: -1 });
+    res.status(200).json({ success: true, alerts });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteAlert = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await Alert.findByIdAndDelete(id);
+    res.status(200).json({ success: true, message: 'Alert cleared' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const unblockUser = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+    user.status = 'active';
+    await user.save();
+    res.status(200).json({ success: true, message: 'User unblocked successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getUsersAndCertificates,
   approveCertificate,
   rejectCertificate,
+  getAdminAlerts,
+  deleteAlert,
+  unblockUser,
 };

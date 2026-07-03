@@ -16,7 +16,7 @@ const protect = (req, res, next) => {
   }
 };
 
-const protectUser = (req, res, next) => {
+const protectUser = async (req, res, next) => {
   const token = req.cookies.token;
 
   if (!token) {
@@ -25,6 +25,17 @@ const protectUser = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secretkey123');
+    
+    const User = require('../models/User');
+    const userExists = await User.findById(decoded.id);
+    if (!userExists) {
+      return res.status(401).json({ success: false, message: 'User not found' });
+    }
+    if (userExists.status === 'blocked') {
+      res.clearCookie('token');
+      return res.status(403).json({ success: false, message: 'Your account has been automatically blocked for violating moderation guidelines.' });
+    }
+
     req.user = decoded;
     next();
   } catch (error) {

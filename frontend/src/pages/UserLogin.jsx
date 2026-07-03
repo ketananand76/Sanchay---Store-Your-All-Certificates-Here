@@ -17,6 +17,15 @@ export default function UserLogin() {
     }
   }, [user, loading, navigate]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const errParam = params.get('error');
+    if (errParam) {
+      toast.error(errParam, { duration: 6000 });
+      window.history.replaceState(null, '', '/login');
+    }
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email || !password) {

@@ -77,9 +77,13 @@ const {
   deleteAccount,
   getAllUsers,
   getUserProfile,
+  reportAbusiveLanguage,
 } = require('./controllers/socialController');
 const { getChatMessages, markAsRead, getUnreadCounts } = require('./controllers/messageController');
-const { getUsersAndCertificates, approveCertificate, rejectCertificate } = require('./controllers/adminMonitorController');
+const { 
+  getUsersAndCertificates, approveCertificate, rejectCertificate, 
+  getAdminAlerts, deleteAlert, unblockUser 
+} = require('./controllers/adminMonitorController');
 const { protectUser } = require('./middleware/authMiddleware');
 
 // Serve local static files
@@ -110,6 +114,7 @@ app.put('/api/social/profile', protectUser, upload.single('file'), updateAdvance
 app.delete('/api/social/profile', protectUser, deleteAccount);
 app.get('/api/social/users', protectUser, getAllUsers);
 app.get('/api/social/profile/:id', protectUser, getUserProfile);
+app.post('/api/social/report-abusive', protectUser, reportAbusiveLanguage);
 
 // 4. Message / Chat routes
 app.get('/api/messages/unread/counts', protectUser, getUnreadCounts);
@@ -127,6 +132,9 @@ app.post('/api/messages/upload', protectUser, upload.single('file'), (req, res) 
 app.get('/api/admin/users-monitor', protect, getUsersAndCertificates);
 app.put('/api/admin/certificates/:id/approve', protect, approveCertificate);
 app.put('/api/admin/certificates/:id/reject', protect, rejectCertificate);
+app.get('/api/admin/alerts', protect, getAdminAlerts);
+app.delete('/api/admin/alerts/:id', protect, deleteAlert);
+app.put('/api/admin/users/:userId/unblock', protect, unblockUser);
 
 // 6. Certificate public routes
 app.get('/api/certificates', getCertificates);
@@ -161,6 +169,20 @@ app.set('socketio', io);
 const onlineUsers = {}; // socket.id -> userId
 const userSockets = {}; // userId -> socket.id
 
+// Abusive Words list (Hindi, English, etc.)
+const ABUSIVE_WORDS = [
+  'fuck', 'shit', 'asshole', 'bitch', 'bastard', 'cunt', 'dick', 'pussy', 'slut', 'whore',
+  'chutiya', 'madarchod', 'behenchod', 'gandu', 'bhosdike', 'harami', 'saala', 'kamina',
+  'चूतिया', 'मादरचोद', 'बहनचोद', 'गांडू', 'भोसड़ीके', 'हरामी', 'साला', 'कमीना'
+];
+
+const checkAbusiveText = (text) => {
+  if (!text) return false;
+  // Remove basic punctuation and check words
+  const words = text.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"").split(/\s+/);
+  return words.some(word => ABUSIVE_WORDS.includes(word) || ABUSIVE_WORDS.some(bad => word.includes(bad)));
+};
+
 io.on('connection', (socket) => {
   console.log('Socket client connected:', socket.id);
 
@@ -173,8 +195,30 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('register-admin', () => {
+    socket.join('admin');
+    console.log(`[Socket] Admin registered in admin room: ${socket.id}`);
+  });
+
   socket.on('send-message', async ({ senderId, recipientId, content, messageType, fileUrl }) => {
     try {
+      // Abusive words moderation check
+      if (messageType !== 'image' && checkAbusiveText(content)) {
+        const { blockUserAndAlert } = require('./controllers/socialController');
+        const alert = await blockUserAndAlert(senderId, `Automated block: Abusive word used in direct chat text: "${content}"`);
+        
+        // Notify sender of immediate block
+        io.to(String(senderId)).emit('blocked-user', { 
+          message: 'Your account has been automatically blocked for violating our abusive language policy.' 
+        });
+        
+        // Notify admins of live alert
+        if (alert) {
+          io.to('admin').emit('admin-alert-created', alert);
+        }
+        return; // Reject message emission
+      }
+
       const msg = await Message.create({
         sender: senderId,
         recipient: recipientId,
@@ -197,14 +241,35 @@ io.on('connection', (socket) => {
     console.log(`[Socket] User joined group room: ${groupId}`);
   });
 
-  socket.on('send-group-message', ({ senderId, senderName, groupId, content }) => {
-    io.to(groupId).emit('receive-group-message', {
-      senderId,
-      senderName,
-      groupId,
-      content,
-      createdAt: new Date().toISOString(),
-    });
+  socket.on('send-group-message', async ({ senderId, senderName, groupId, content }) => {
+    try {
+      // Abusive words moderation check
+      if (checkAbusiveText(content)) {
+        const { blockUserAndAlert } = require('./controllers/socialController');
+        const alert = await blockUserAndAlert(senderId, `Automated block: Abusive word used in group chat room "${groupId}": "${content}"`);
+        
+        // Notify sender of immediate block
+        io.to(String(senderId)).emit('blocked-user', { 
+          message: 'Your account has been automatically blocked for violating our abusive language policy.' 
+        });
+        
+        // Notify admins of live alert
+        if (alert) {
+          io.to('admin').emit('admin-alert-created', alert);
+        }
+        return; // Reject message emission
+      }
+
+      io.to(groupId).emit('receive-group-message', {
+        senderId,
+        senderName,
+        groupId,
+        content,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('Error handling group message:', err);
+    }
   });
 
   // Typing indicators
