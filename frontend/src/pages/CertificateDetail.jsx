@@ -22,7 +22,18 @@ export default function CertificateDetail() {
   });
 
   const isAdmin = !!admin;
-  const isOwner = user && cert && (cert.uploadedBy === user._id || cert.uploadedBy?._id === user._id);
+  const isOwner = user && cert && cert.uploadedBy && (
+    String(cert.uploadedBy) === String(user._id) ||
+    String(cert.uploadedBy._id || cert.uploadedBy) === String(user._id)
+  );
+
+  console.log('Vault Authorization debug:', {
+    user: user?._id,
+    admin: admin?._id || !!admin,
+    certOwner: cert?.uploadedBy,
+    isOwner,
+    isAdmin
+  });
 
   // Delete certificate mutation
   const { mutate: deleteCert, isLoading: isDeleting } = useMutation({
