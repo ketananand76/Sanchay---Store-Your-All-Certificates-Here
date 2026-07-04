@@ -389,6 +389,16 @@ const getUserProfile = async (req, res, next) => {
       throw new Error('User profile not found');
     }
 
+    // Filter out expired stories
+    const now = new Date();
+    if (user.stories && user.stories.length > 0) {
+      const activeStories = user.stories.filter(story => new Date(story.expiresAt) > now);
+      if (activeStories.length !== user.stories.length) {
+        user.stories = activeStories;
+        await user.save();
+      }
+    }
+
     // Check if the current user is the owner or an admin
     let showAll = false;
     const jwt = require('jsonwebtoken');
@@ -461,6 +471,151 @@ const reportAbusiveLanguage = async (req, res, next) => {
   }
 };
 
+const uploadUserStory = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      res.status(400);
+      throw new Error('Please select an image or video for your story.');
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+
+    let fileUrl = '';
+    const cloudinaryResult = await uploadToCloudinary(req.file.path);
+    if (cloudinaryResult) {
+      fileUrl = cloudinaryResult.url;
+    } else {
+      fileUrl = `/uploads/${req.file.filename}`;
+    }
+
+    const audience = req.body.audience || 'public';
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const newStory = {
+      fileUrl,
+      fileType: req.file.mimetype.includes('video') ? 'video' : 'image',
+      audience,
+      createdAt: new Date(),
+      expiresAt,
+    };
+
+    user.stories.push(newStory);
+    await user.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Story uploaded successfully!',
+      stories: user.stories,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteUserStory = async (req, res, next) => {
+  try {
+    const { storyId } = req.params;
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+
+    user.stories = user.stories.filter((story) => String(story._id) !== storyId);
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Story deleted successfully',
+      stories: user.stories,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const createHighlight = async (req, res, next) => {
+  try {
+    const { title, coverIcon, storyUrls } = req.body;
+    if (!title) {
+      res.status(400);
+      throw new Error('Highlight title is required.');
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+
+    const newHighlight = {
+      title,
+      coverIcon: coverIcon || 'Award',
+      stories: storyUrls || [],
+      createdAt: new Date(),
+    };
+
+    user.highlights.push(newHighlight);
+    await user.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Highlight created successfully!',
+      highlights: user.highlights,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteHighlight = async (req, res, next) => {
+  try {
+    const { highlightId } = req.params;
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+
+    user.highlights = user.highlights.filter((hl) => String(hl._id) !== highlightId);
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Highlight deleted successfully',
+      highlights: user.highlights,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateCloseFriends = async (req, res, next) => {
+  try {
+    const { closeFriends } = req.body;
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+
+    user.closeFriends = closeFriends || [];
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Close Friends list updated successfully',
+      closeFriends: user.closeFriends,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   toggleFollow,
   searchUsers,
@@ -473,4 +628,9 @@ module.exports = {
   getUserProfile,
   blockUserAndAlert,
   reportAbusiveLanguage,
+  uploadUserStory,
+  deleteUserStory,
+  createHighlight,
+  deleteHighlight,
+  updateCloseFriends,
 };

@@ -80,13 +80,19 @@ const {
   getAllUsers,
   getUserProfile,
   reportAbusiveLanguage,
+  uploadUserStory,
+  deleteUserStory,
+  createHighlight,
+  deleteHighlight,
+  updateCloseFriends,
 } = require('./controllers/socialController');
 const { getChatMessages, markAsRead, getUnreadCounts } = require('./controllers/messageController');
 const { getNotifications, markAllAsRead } = require('./controllers/notificationController');
 const { 
   getUsersAndCertificates, approveCertificate, rejectCertificate, 
   getAdminAlerts, deleteAlert, unblockUser,
-  broadcastNotification, getActiveUsersLocations, updateUserLocation
+  broadcastNotification, getActiveUsersLocations, updateUserLocation,
+  toggleGovIdVerification, getUserPaymentHistory
 } = require('./controllers/adminMonitorController');
 const { requestPremium, getMyPaymentStatus, getPendingPayments, verifyPayment } = require('./controllers/paymentController');
 const { protectUser, restrictTo } = require('./middleware/authMiddleware');
@@ -121,6 +127,11 @@ app.delete('/api/social/profile', protectUser, deleteAccount);
 app.get('/api/social/users', protectUser, getAllUsers);
 app.get('/api/social/profile/:id', getUserProfile);
 app.post('/api/social/report-abusive', protectUser, reportAbusiveLanguage);
+app.post('/api/social/stories', protectUser, upload.single('file'), uploadUserStory);
+app.delete('/api/social/stories/:storyId', protectUser, deleteUserStory);
+app.post('/api/social/highlights', protectUser, createHighlight);
+app.delete('/api/social/highlights/:highlightId', protectUser, deleteHighlight);
+app.put('/api/social/close-friends', protectUser, updateCloseFriends);
 
 // 4. Message / Chat routes
 app.get('/api/messages/unread/counts', protectUser, getUnreadCounts);
@@ -156,6 +167,8 @@ app.delete('/api/admin/alerts/:id', protect, deleteAlert);
 app.put('/api/admin/users/:userId/unblock', protect, unblockUser);
 app.post('/api/admin/broadcast', protect, broadcastNotification);
 app.get('/api/admin/active-locations', protect, getActiveUsersLocations);
+app.put('/api/admin/users/:userId/verify-gov-id', protect, toggleGovIdVerification);
+app.get('/api/admin/users/:userId/payment-history', protect, getUserPaymentHistory);
 
 // User location tracking route
 app.post('/api/users/update-location', protectUser, updateUserLocation);

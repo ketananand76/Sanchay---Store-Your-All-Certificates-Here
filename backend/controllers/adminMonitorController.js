@@ -262,6 +262,55 @@ const updateUserLocation = async (req, res, next) => {
   }
 };
 
+const toggleGovIdVerification = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { isGovIdVerified } = req.body;
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+    user.isGovIdVerified = isGovIdVerified;
+    await user.save();
+
+    // Notify user
+    const Notification = require('../models/Notification');
+    await Notification.create({
+      recipient: user._id,
+      type: 'approval',
+      message: isGovIdVerified
+        ? 'Congratulations! Your Government ID has been verified. Green checkmark badge unlocked on your profile.'
+        : 'Your Government ID verification status has been revoked/disabled.',
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Government ID verification status updated to ${isGovIdVerified}`,
+      user: {
+        _id: user._id,
+        isGovIdVerified: user.isGovIdVerified
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getUserPaymentHistory = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const Payment = require('../models/Payment');
+    const payments = await Payment.find({ user: userId }).sort({ createdAt: -1 });
+    res.status(200).json({
+      success: true,
+      payments
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getUsersAndCertificates,
   approveCertificate,
@@ -272,4 +321,6 @@ module.exports = {
   broadcastNotification,
   getActiveUsersLocations,
   updateUserLocation,
+  toggleGovIdVerification,
+  getUserPaymentHistory,
 };

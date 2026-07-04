@@ -121,7 +121,40 @@ const userSchema = new mongoose.Schema(
       city: { type: String, default: '' },
       country: { type: String, default: '' },
       lastActive: { type: Date, default: Date.now }
-    }
+    },
+    isGovIdVerified: {
+      type: Boolean,
+      default: false
+    },
+    closeFriends: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      }
+    ],
+    stories: [
+      {
+        fileUrl: { type: String, required: true },
+        fileType: { type: String, enum: ['image', 'video'], default: 'image' },
+        audience: { type: String, enum: ['public', 'close-friends'], default: 'public' },
+        createdAt: { type: Date, default: Date.now },
+        expiresAt: { type: Date, required: true }
+      }
+    ],
+    highlights: [
+      {
+        title: { type: String, required: true },
+        coverIcon: { type: String, default: 'Award' },
+        stories: [
+          {
+            fileUrl: { type: String, required: true },
+            fileType: { type: String, default: 'image' },
+            createdAt: { type: Date, default: Date.now }
+          }
+        ],
+        createdAt: { type: Date, default: Date.now }
+      }
+    ]
   },
   { timestamps: true }
 );

@@ -7,7 +7,8 @@ import {
   Globe, Code, Briefcase, MessageSquare, Lock, Heart, Award, Calendar,
   Loader2, ArrowLeft, Settings, Grid, User, Mail, Upload, ShieldAlert,
   Save, Eye, EyeOff, Bell, BellOff, Moon, Sun, Key, Trash2, Shield,
-  Check, ChevronRight, AlertTriangle, X, Camera, Link as LinkIcon, Phone
+  Check, ChevronRight, AlertTriangle, X, Camera, Link as LinkIcon, Phone,
+  Sparkles, Plus, Play, CheckCircle2, Star
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -19,8 +20,35 @@ export default function UserProfile() {
 
   const [listModal, setListModal] = useState({ show: false, title: '', users: [] });
   const [activeProfileTab, setActiveProfileTab] = useState('posts'); // 'posts' | 'settings'
+
+  // Stories & Highlights States
+  const [storyViewer, setStoryViewer] = useState({ show: false, stories: [], activeIndex: 0 });
+  const [storyCreatorOpen, setStoryCreatorOpen] = useState(false);
+  const [storyAudience, setStoryAudience] = useState('public');
+  const [storyFile, setStoryFile] = useState(null);
+  const [isUploadingStory, setIsUploadingStory] = useState(false);
+
+  const [highlightCreatorOpen, setHighlightCreatorOpen] = useState(false);
+  const [newHighlightTitle, setNewHighlightTitle] = useState('');
+  const [selectedHighlightStories, setSelectedHighlightStories] = useState([]);
+  const [newHighlightCoverIcon, setNewHighlightCoverIcon] = useState('Award');
+
+  // Close Friends List Modal
+  const [closeFriendsModalOpen, setCloseFriendsModalOpen] = useState(false);
+  const [closeFriendsList, setCloseFriendsList] = useState(currentUser?.closeFriends || []);
   const isSelf = currentUser && String(currentUser._id) === String(id);
   const isAdmin = !!admin;
+
+  const renderHighlightIcon = (name) => {
+    switch (name) {
+      case 'Award': return <Award className="h-5 w-5 text-indian-gold" />;
+      case 'Heart': return <Heart className="h-5 w-5 text-red-400" />;
+      case 'Star': return <Star className="h-5 w-5 text-yellow-400" />;
+      case 'Code': return <Code className="h-5 w-5 text-cyan-400" />;
+      case 'Globe': return <Globe className="h-5 w-5 text-blue-400" />;
+      default: return <Award className="h-5 w-5 text-indian-gold" />;
+    }
+  };
 
   // Redirection healing for '/profile/undefined'
   React.useEffect(() => {
@@ -172,6 +200,123 @@ export default function UserProfile() {
     onError: (err) => toast.error(err.response?.data?.message || 'Action failed'),
   });
 
+  React.useEffect(() => {
+    if (currentUser?.closeFriends) {
+      setCloseFriendsList(currentUser.closeFriends);
+    }
+  }, [currentUser]);
+
+  // Handle Story Upload Submit
+  const handleStoryUpload = async (e) => {
+    e.preventDefault();
+    if (!storyFile) return toast.error('Please select an image or video.');
+
+    setIsUploadingStory(true);
+    const formData = new FormData();
+    formData.append('file', storyFile);
+    formData.append('audience', storyAudience);
+
+    try {
+      const res = await api.post('/api/social/stories', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (res.data.success) {
+        toast.success('Story uploaded successfully! ✨');
+        setStoryFile(null);
+        setStoryCreatorOpen(false);
+        queryClient.invalidateQueries({ queryKey: ['userProfile', id] });
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to upload story.');
+    } finally {
+      setIsUploadingStory(false);
+    }
+  };
+
+  // Handle Story Delete
+  const handleStoryDelete = async (storyId) => {
+    if (!window.confirm('Delete this story?')) return;
+    try {
+      const res = await api.delete(`/api/social/stories/${storyId}`);
+      if (res.data.success) {
+        toast.success('Story deleted.');
+        // Update viewer active index or close
+        const nextStories = storyViewer.stories.filter(s => s._id !== storyId);
+        if (nextStories.length === 0) {
+          setStoryViewer({ show: false, stories: [], activeIndex: 0 });
+        } else {
+          const nextIndex = Math.max(0, storyViewer.activeIndex - 1);
+          setStoryViewer({ ...storyViewer, stories: nextStories, activeIndex: nextIndex });
+        }
+        queryClient.invalidateQueries({ queryKey: ['userProfile', id] });
+      }
+    } catch (err) {
+      toast.error('Failed to delete story.');
+    }
+  };
+
+  // Handle Create Highlight
+  const handleCreateHighlight = async (e) => {
+    e.preventDefault();
+    if (!newHighlightTitle.trim()) return toast.error('Highlight title is required');
+    if (selectedHighlightStories.length === 0) return toast.error('Please select at least one story');
+
+    try {
+      const res = await api.post('/api/social/highlights', {
+        title: newHighlightTitle.trim(),
+        coverIcon: newHighlightCoverIcon,
+        storyUrls: selectedHighlightStories.map(url => ({ fileUrl: url, fileType: 'image' })),
+      });
+      if (res.data.success) {
+        toast.success('Highlight created successfully!');
+        setNewHighlightTitle('');
+        setSelectedHighlightStories([]);
+        setHighlightCreatorOpen(false);
+        queryClient.invalidateQueries({ queryKey: ['userProfile', id] });
+      }
+    } catch (err) {
+      toast.error('Failed to create highlight.');
+    }
+  };
+
+  // Handle Highlight Delete
+  const handleHighlightDelete = async (highlightId, e) => {
+    e.stopPropagation(); // prevent playing highlight
+    if (!window.confirm('Delete this highlight?')) return;
+    try {
+      const res = await api.delete(`/api/social/highlights/${highlightId}`);
+      if (res.data.success) {
+        toast.success('Highlight deleted.');
+        queryClient.invalidateQueries({ queryKey: ['userProfile', id] });
+      }
+    } catch (err) {
+      toast.error('Failed to delete highlight.');
+    }
+  };
+
+  // Handle Toggle Close Friend
+  const handleToggleCloseFriend = async (friendId) => {
+    const friendIdStr = String(friendId._id || friendId);
+    const isCF = closeFriendsList.some(cfId => String(cfId._id || cfId) === friendIdStr);
+    let nextList;
+    if (isCF) {
+      nextList = closeFriendsList.filter(cfId => String(cfId._id || cfId) !== friendIdStr);
+    } else {
+      nextList = [...closeFriendsList, friendIdStr];
+    }
+    
+    // Optimistic update
+    setCloseFriendsList(nextList);
+    try {
+      await api.put('/api/social/close-friends', { closeFriends: nextList });
+      toast.success(isCF ? 'Removed from Close Friends' : 'Added to Close Friends');
+      checkAuth();
+    } catch (err) {
+      toast.error('Failed to update Close Friends');
+      setCloseFriendsList(closeFriendsList); // rollback
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-dark-bg">
@@ -180,7 +325,7 @@ export default function UserProfile() {
     );
   }
 
-  if (error || !data) {
+  if (error || !data || !data.user) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 min-h-screen text-center">
         <div className="glass-panel p-12 rounded-2xl text-red-400 border-red-950/50">
@@ -449,50 +594,137 @@ export default function UserProfile() {
         {isPremiumActive && (
           <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-xl pointer-events-none"></div>
         )}
-        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 relative z-10">
-          {/* Avatar */}
-          <div className="relative shrink-0">
-            <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden flex items-center justify-center font-accent text-3xl font-bold shadow-lg ${
-              isPremiumActive
-                ? 'bg-gradient-to-tr from-amber-500 via-yellow-400 to-amber-300 border-2 border-amber-400 text-slate-900'
-                : 'bg-purple-950/30 border-2 border-purple-800/40 text-purple-300'
-            }`}>
-              {user.profilePicture ? (
-                <img src={getFileUrl(user.profilePicture)} alt={user.name} className="w-full h-full object-cover" />
-              ) : (
-                user.name.charAt(0).toUpperCase()
-              )}
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-8 relative z-10">
+          {/* Avatar container with Story ring (Instagram style) */}
+          <div className="relative shrink-0 flex flex-col items-center">
+            <div 
+              onClick={() => {
+                if (user.stories && user.stories.length > 0) {
+                  setStoryViewer({ show: true, stories: user.stories, activeIndex: 0 });
+                } else if (isSelf) {
+                  setStoryCreatorOpen(true);
+                }
+              }}
+              className={`w-28 h-28 sm:w-32 sm:h-32 rounded-full flex items-center justify-center p-[4px] transition-transform duration-300 ${
+                user.stories && user.stories.length > 0
+                  ? user.stories.some(s => s.audience === 'close-friends')
+                    ? 'bg-emerald-500 cursor-pointer hover:scale-105 shadow-[0_0_15px_rgba(16,185,129,0.4)]'
+                    : 'bg-gradient-to-tr from-purple-600 via-pink-500 to-amber-400 cursor-pointer hover:scale-105 shadow-[0_0_15px_rgba(236,72,153,0.4)]'
+                  : 'bg-purple-950/30 border border-purple-800/40'
+              }`}
+            >
+              <div className="w-full h-full rounded-full overflow-hidden bg-[#0c0a13] flex items-center justify-center font-accent text-4xl font-bold text-purple-300 border-2 border-[#0c0a13]">
+                {user.profilePicture ? (
+                  <img src={getFileUrl(user.profilePicture)} alt={user.name} className="w-full h-full object-cover" />
+                ) : (
+                  user.name.charAt(0).toUpperCase()
+                )}
+              </div>
             </div>
             {isSelf && (
               <button
-                onClick={() => { setActiveProfileTab('settings'); fileInputRef.current?.click(); }}
-                className="absolute bottom-0 right-0 w-8 h-8 bg-accent rounded-full flex items-center justify-center border-2 border-[#0c0a13] hover:bg-accent-dark transition-colors shadow-lg"
-                title="Change photo"
+                onClick={() => setStoryCreatorOpen(true)}
+                className="absolute bottom-0 right-2 w-8 h-8 bg-accent rounded-full flex items-center justify-center border-2 border-[#0c0a13] hover:bg-accent-dark transition-all shadow-lg hover:scale-105"
+                title="Add Story"
               >
-                <Camera className="h-3.5 w-3.5 text-white" />
+                <Plus className="h-4 w-4 text-white" />
               </button>
             )}
           </div>
 
-          {/* Meta */}
-          <div className="flex-1 space-y-3 text-center sm:text-left">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-center sm:justify-start">
-              <h2 className="font-accent text-2xl font-bold text-white tracking-wide flex items-center gap-1.5 justify-center sm:justify-start">
-                {user.name}
-                {isPremiumActive && (
-                  <span className="text-amber-500 animate-pulse" title="Premium Gold Badge">
-                    <Sparkles className="h-5 w-5 fill-current" />
+          {/* Meta & Stats (Instagram layout) */}
+          <div className="flex-1 space-y-4 text-center sm:text-left min-w-0 w-full">
+            {/* Top row: Name & action buttons */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+              <div className="flex items-center gap-2 justify-center sm:justify-start">
+                <h2 className="font-accent text-2xl font-bold text-white tracking-wide flex items-center gap-1.5 truncate">
+                  {user.name}
+                  {isPremiumActive && user.isGovIdVerified ? (
+                    <span className="text-emerald-400" title="Verified Creator (Gov. ID & Subscription Verified)">
+                      <CheckCircle2 className="h-5 w-5 fill-emerald-950/80 ml-1.5" />
+                    </span>
+                  ) : isPremiumActive ? (
+                    <span className="text-amber-500 animate-pulse" title="Premium Gold Badge">
+                      <Sparkles className="h-5 w-5 fill-current" />
+                    </span>
+                  ) : null}
+                </h2>
+                {user.privateAccount && (
+                  <span className="inline-flex items-center gap-1 bg-[#120f26]/80 text-[9px] font-bold text-purple-300 uppercase tracking-widest px-2 py-0.5 rounded border border-purple-900/60 w-fit">
+                    <Lock className="h-2.5 w-2.5" /> Private
                   </span>
                 )}
-              </h2>
-              {user.privateAccount && (
-                <span className="inline-flex items-center gap-1 bg-[#120f26]/80 text-[9px] font-bold text-purple-300 uppercase tracking-widest px-2 py-0.5 rounded border border-purple-900/60 w-fit mx-auto sm:mx-0">
-                  <Lock className="h-2.5 w-2.5" /> Private
-                </span>
-              )}
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex flex-wrap gap-2.5 justify-center sm:justify-start">
+                {isSelf ? (
+                  <>
+                    <button
+                      onClick={() => setActiveProfileTab('settings')}
+                      className={`flex items-center gap-1.5 font-bold px-4 py-2 rounded-xl text-xs transition-all ${
+                        activeProfileTab === 'settings'
+                          ? 'bg-accent text-white shadow-lg shadow-purple-500/20'
+                          : 'bg-purple-950/30 border border-purple-800/40 hover:bg-purple-900/30 text-purple-300'
+                      }`}
+                    >
+                      <Settings className="h-3.5 w-3.5" /> Edit Profile
+                    </button>
+                    <button
+                      onClick={() => setCloseFriendsModalOpen(true)}
+                      className="flex items-center gap-1.5 font-bold px-4 py-2 rounded-xl text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-all"
+                    >
+                      <Star className="h-3.5 w-3.5" /> Close Friends
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleFollowClick}
+                      disabled={followMutation.isLoading}
+                      className={`font-bold px-5 py-2 rounded-xl text-xs hover:scale-[1.01] transition-all ${
+                        isFollowing
+                          ? 'border border-purple-900/60 bg-[#120f26] text-purple-300 hover:bg-purple-950/30'
+                          : 'bg-gradient-to-r from-accent to-accent-dark text-white shadow-md shadow-purple-500/10'
+                      }`}
+                    >
+                      {isFollowing ? 'Following' : isFollowerOfMe ? 'Follow Back' : 'Follow'}
+                    </button>
+                    <Link
+                      to={`/chat?userId=${user._id}`}
+                      className="font-bold px-5 py-2 rounded-xl text-xs bg-purple-950/30 border border-purple-800/40 hover:bg-purple-900/30 text-purple-300 transition-all flex items-center gap-1.5"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" /> Message
+                    </Link>
+                  </>
+                )}
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start -mt-1.5 mb-2.5">
+            {/* Stats row (Instagram layout) */}
+            <div className="flex items-center justify-center sm:justify-start gap-8 border-y border-purple-950/20 py-2.5 text-xs">
+              <div>
+                <span className="text-white font-bold text-sm block sm:inline mr-1">{certificates.length}</span>
+                <span className="text-gray-500 uppercase tracking-wider text-[9px]">Certificates</span>
+              </div>
+              <button
+                onClick={() => setListModal({ show: true, title: 'Followers', users: user.followers || [] })}
+                className="text-left cursor-pointer hover:opacity-85 transition-opacity"
+              >
+                <span className="text-white font-bold text-sm block sm:inline mr-1">{user.followers?.length || 0}</span>
+                <span className="text-gray-500 uppercase tracking-wider text-[9px] hover:text-purple-400">Followers</span>
+              </button>
+              <button
+                onClick={() => setListModal({ show: true, title: 'Following', users: user.following || [] })}
+                className="text-left cursor-pointer hover:opacity-85 transition-opacity"
+              >
+                <span className="text-white font-bold text-sm block sm:inline mr-1">{user.following?.length || 0}</span>
+                <span className="text-gray-500 uppercase tracking-wider text-[9px] hover:text-purple-400">Following</span>
+              </button>
+            </div>
+
+            {/* Role indicator */}
+            <div className="flex justify-center sm:justify-start">
               <span className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-xl border ${
                 user.role === 'Employer' || user.role === 'HR Manager'
                   ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-300'
@@ -506,33 +738,11 @@ export default function UserProfile() {
                   href={getFileUrl(user.resumeUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-xl border bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25 transition-all cursor-pointer"
+                  className="ml-2 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-xl border bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25 transition-all cursor-pointer animate-pulse"
                 >
                   📄 View Resume
                 </a>
               )}
-            </div>
-
-            {/* Stats */}
-            <div className="flex items-center justify-center sm:justify-start gap-6 border-y border-purple-950/20 py-2.5 text-xs">
-              <div>
-                <span className="text-white font-bold text-sm block">{certificates.length}</span>
-                <span className="text-gray-500 uppercase tracking-wider text-[9px]">Certificates</span>
-              </div>
-              <button
-                onClick={() => setListModal({ show: true, title: 'Followers', users: user.followers || [] })}
-                className="text-left cursor-pointer hover:opacity-85 transition-opacity"
-              >
-                <span className="text-white font-bold text-sm block">{user.followers?.length || 0}</span>
-                <span className="text-gray-500 uppercase tracking-wider text-[9px] hover:text-purple-400">Followers</span>
-              </button>
-              <button
-                onClick={() => setListModal({ show: true, title: 'Following', users: user.following || [] })}
-                className="text-left cursor-pointer hover:opacity-85 transition-opacity"
-              >
-                <span className="text-white font-bold text-sm block">{user.following?.length || 0}</span>
-                <span className="text-gray-500 uppercase tracking-wider text-[9px] hover:text-purple-400">Following</span>
-              </button>
             </div>
 
             {/* Bio */}
@@ -565,46 +775,54 @@ export default function UserProfile() {
                 )}
               </div>
             )}
-
-            {/* Action buttons */}
-            <div className="flex flex-wrap gap-3 pt-1 justify-center sm:justify-start">
-              {isPremiumActive && (
-                <button
-                  onClick={handleDownloadPDF}
-                  className="bg-amber-500/15 border border-amber-500/30 text-amber-400 font-bold px-5 py-2 rounded-xl text-xs flex items-center gap-1.5 hover:bg-amber-500/25 transition-all shadow-md shadow-amber-505/5"
-                >
-                  <Award className="h-3.5 w-3.5 text-amber-500" /> PDF Portfolio
-                </button>
-              )}
-              {isSelf ? (
-                <button
-                  onClick={() => setActiveProfileTab('settings')}
-                  className={`flex items-center gap-2 font-bold px-5 py-2 rounded-xl text-xs transition-all ${
-                    activeProfileTab === 'settings'
-                      ? 'bg-accent text-white shadow-lg shadow-purple-500/20'
-                      : 'bg-purple-950/30 border border-purple-800/40 hover:bg-purple-900/30 text-purple-300'
-                  }`}
-                >
-                  <Settings className="h-3.5 w-3.5" /> Edit Profile
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={handleFollowClick}
-                    disabled={followMutation.isLoading}
-                    className={`font-bold px-6 py-2 rounded-xl text-xs hover:scale-[1.01] transition-all ${
-                      isFollowing
-                        ? 'border border-purple-900/60 bg-[#120f26] text-purple-300 hover:bg-purple-950/30'
-                        : 'bg-gradient-to-r from-accent to-accent-dark text-white shadow-md shadow-purple-500/10'
-                    }`}
-                  >
-                    {isFollowing ? 'Following' : isFollowerOfMe ? 'Follow Back' : 'Follow'}
-                  </button>
-                </>
-              )}
-            </div>
           </div>
         </div>
+      </div>
+
+      {/* ======================================= */}
+      {/* HIGHLIGHTS SECTION */}
+      {/* ======================================= */}
+      <div className="flex items-center gap-6 overflow-x-auto py-3 px-2 mb-6 scrollbar-hide border-b border-purple-950/15">
+        {/* Render existing highlights */}
+        {user.highlights && user.highlights.map((hl) => (
+          <div key={hl._id} className="relative flex flex-col items-center gap-1.5 shrink-0 group">
+            <div
+              onClick={() => setStoryViewer({ show: true, stories: hl.stories, activeIndex: 0 })}
+              className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-purple-950/25 border border-purple-800/40 hover:border-purple-600/60 flex items-center justify-center cursor-pointer shadow-lg hover:scale-105 transition-all"
+            >
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#0c0a13] flex items-center justify-center text-indian-gold">
+                {renderHighlightIcon(hl.coverIcon)}
+              </div>
+            </div>
+            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider w-16 truncate text-center">
+              {hl.title}
+            </span>
+            {isSelf && (
+              <button
+                onClick={(e) => handleHighlightDelete(hl._id, e)}
+                className="absolute -top-1 -right-1 w-5 h-5 bg-red-650 rounded-full flex items-center justify-center border border-[#0c0a13] hover:bg-red-750 transition-colors opacity-0 group-hover:opacity-100 shadow-md"
+                title="Delete Highlight"
+              >
+                <X className="h-3 w-3 text-white" />
+              </button>
+            )}
+          </div>
+        ))}
+
+        {/* Add Highlight button for profile owner */}
+        {isSelf && (
+          <div className="flex flex-col items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => setHighlightCreatorOpen(true)}
+              className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-purple-950/10 border border-dashed border-purple-850 hover:border-purple-600 flex items-center justify-center cursor-pointer hover:scale-105 transition-all"
+            >
+              <Plus className="h-5 w-5 text-purple-400" />
+            </button>
+            <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">
+              New
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ======================================= */}
@@ -1426,6 +1644,386 @@ export default function UserProfile() {
                     </div>
                   </div>
                 ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================= */}
+      {/* 🎬 INSTAGRAM STORY VIEWER MODAL          */}
+      {/* ======================================= */}
+      {storyViewer.show && storyViewer.stories.length > 0 && (
+        <div className="fixed inset-0 z-[150] bg-[#07050b]/95 backdrop-blur-lg flex items-center justify-center p-0 select-none">
+          <div className="w-full max-w-lg h-full sm:h-[85vh] sm:max-w-md bg-[#000] sm:rounded-3xl relative flex flex-col justify-between overflow-hidden shadow-2xl border border-purple-950/20">
+            {/* Story Top Progress Indicators */}
+            <div className="absolute top-3 left-3 right-3 z-30 flex gap-1">
+              {storyViewer.stories.map((s, idx) => (
+                <div key={idx} className="flex-1 h-0.5 bg-gray-700/60 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-white transition-all ease-linear"
+                    style={{
+                      width: idx < storyViewer.activeIndex 
+                        ? '100%' 
+                        : idx === storyViewer.activeIndex 
+                        ? '100%' 
+                        : '0%',
+                      transitionDuration: idx === storyViewer.activeIndex ? '5000ms' : '0ms'
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Story Header */}
+            <div className="absolute top-6 left-3 right-3 z-30 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full border border-purple-800/40 overflow-hidden flex items-center justify-center bg-purple-950 text-white font-bold text-xs">
+                  {user.profilePicture ? (
+                    <img src={getFileUrl(user.profilePicture)} alt={user.name} className="w-full h-full object-cover" />
+                  ) : user.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-white block leading-tight">{user.name}</span>
+                  <span className="text-[8px] text-gray-400 block leading-tight">
+                    {new Date(storyViewer.stories[storyViewer.activeIndex].createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                {storyViewer.stories[storyViewer.activeIndex].audience === 'close-friends' && (
+                  <span className="bg-emerald-500/25 border border-emerald-500/40 text-emerald-400 text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                    <Star className="h-2 w-2 fill-current" /> Close Friend
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                {isSelf && (
+                  <button
+                    onClick={() => handleStoryDelete(storyViewer.stories[storyViewer.activeIndex]._id)}
+                    className="p-1 rounded-lg bg-red-950/20 hover:bg-red-950/50 text-red-400 border border-red-900/30 transition-colors"
+                    title="Delete Story"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setStoryViewer({ show: false, stories: [], activeIndex: 0 })}
+                  className="p-1 text-gray-400 hover:text-white transition-colors bg-black/45 rounded-full border border-purple-950/30"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Story Viewer Area */}
+            <div className="relative flex-1 bg-black flex items-center justify-center">
+              {/* Previous Click Target */}
+              <div 
+                onClick={() => setStoryViewer(prev => ({ ...prev, activeIndex: Math.max(0, prev.activeIndex - 1) }))}
+                className="absolute left-0 top-0 bottom-0 w-1/4 z-20 cursor-pointer" 
+              />
+              {/* Next Click Target */}
+              <div 
+                onClick={() => {
+                  if (storyViewer.activeIndex < storyViewer.stories.length - 1) {
+                    setStoryViewer(prev => ({ ...prev, activeIndex: prev.activeIndex + 1 }));
+                  } else {
+                    setStoryViewer({ show: false, stories: [], activeIndex: 0 });
+                  }
+                }}
+                className="absolute right-0 top-0 bottom-0 w-3/4 z-20 cursor-pointer" 
+              />
+
+              {storyViewer.stories[storyViewer.activeIndex].fileType === 'video' ? (
+                <video 
+                  src={getFileUrl(storyViewer.stories[storyViewer.activeIndex].fileUrl)} 
+                  autoPlay 
+                  playsInline 
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <img 
+                  src={getFileUrl(storyViewer.stories[storyViewer.activeIndex].fileUrl)} 
+                  alt="User Story" 
+                  className="w-full h-full object-contain"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================= */}
+      {/* 📹 UPLOAD NEW STORY MODAL                 */}
+      {/* ======================================= */}
+      {storyCreatorOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#07050b]/80 backdrop-blur-md p-4">
+          <div className="w-full max-w-md bg-[#12111d] glass-panel border border-purple-950/40 rounded-3xl p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-purple-950/30 pb-3">
+              <h3 className="font-accent text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Plus className="h-4.5 w-4.5 text-accent" /> Share New Story
+              </h3>
+              <button
+                onClick={() => setStoryCreatorOpen(false)}
+                className="p-1.5 text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleStoryUpload} className="space-y-4">
+              {/* File Input */}
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Select Media (Image/Video)</label>
+                <div className="relative border-2 border-dashed border-purple-950/50 hover:border-purple-800/60 rounded-2xl p-6 text-center transition-all bg-[#07050d]">
+                  <input
+                    type="file"
+                    accept="image/*,video/*"
+                    required
+                    onChange={(e) => setStoryFile(e.target.files[0])}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <Upload className="h-8 w-8 text-purple-400 mx-auto mb-2" />
+                  <p className="text-xs text-gray-300 font-semibold">
+                    {storyFile ? storyFile.name : 'Click or Drag file to upload'}
+                  </p>
+                  <p className="text-[9px] text-gray-500 mt-1">Supports images and videos up to 10MB</p>
+                </div>
+              </div>
+
+              {/* Story Audience Selection */}
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Select Audience</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setStoryAudience('public')}
+                    className={`py-2.5 rounded-xl text-xs font-bold transition-all border ${
+                      storyAudience === 'public'
+                        ? 'bg-accent text-white border-accent shadow-md shadow-purple-500/10'
+                        : 'bg-purple-950/20 border-purple-950/50 text-gray-400 hover:text-gray-300'
+                    }`}
+                  >
+                    Public
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStoryAudience('close-friends')}
+                    className={`py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 ${
+                      storyAudience === 'close-friends'
+                        ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-500/10'
+                        : 'bg-purple-950/20 border-purple-950/50 text-gray-400 hover:text-emerald-400/80'
+                    }`}
+                  >
+                    <Star className="h-3.5 w-3.5 fill-current" /> Close Friends
+                  </button>
+                </div>
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="pt-2 border-t border-purple-950/25 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setStoryCreatorOpen(false)}
+                  className="flex-1 bg-purple-950/30 border border-purple-900/40 text-purple-300 py-2.5 rounded-xl text-xs font-bold transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUploadingStory}
+                  className="flex-1 bg-gradient-to-r from-accent to-accent-dark text-white py-2.5 rounded-xl text-xs font-bold hover:scale-[1.01] transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {isUploadingStory ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sharing...
+                    </>
+                  ) : (
+                    'Share Story'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================= */}
+      {/* 📂 HIGHLIGHT CREATOR MODAL                */}
+      {/* ======================================= */}
+      {highlightCreatorOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#07050b]/80 backdrop-blur-md p-4">
+          <div className="w-full max-w-md bg-[#12111d] glass-panel border border-purple-950/40 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-purple-950/30 pb-3">
+              <h3 className="font-accent text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Award className="h-4.5 w-4.5 text-accent" /> Create Highlight
+              </h3>
+              <button
+                onClick={() => setHighlightCreatorOpen(false)}
+                className="p-1.5 text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateHighlight} className="space-y-4">
+              {/* Highlight Title */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Highlight Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Work, Awards, Certificates"
+                  required
+                  value={newHighlightTitle}
+                  onChange={(e) => setNewHighlightTitle(e.target.value)}
+                  className="w-full bg-[#07050d] border border-purple-950/70 hover:border-purple-800/40 focus:border-accent text-gray-200 px-4 py-2.5 rounded-xl text-xs focus:outline-none transition-all"
+                />
+              </div>
+
+              {/* Cover Icon Selector */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Select Cover Icon</label>
+                <div className="flex gap-2.5 justify-between">
+                  {['Award', 'Heart', 'Star', 'Code', 'Globe'].map((icon) => (
+                    <button
+                      key={icon}
+                      type="button"
+                      onClick={() => setNewHighlightCoverIcon(icon)}
+                      className={`p-3 rounded-xl border flex items-center justify-center transition-all ${
+                        newHighlightCoverIcon === icon
+                          ? 'bg-accent/25 border-accent text-accent shadow-md shadow-purple-500/10'
+                          : 'bg-purple-950/20 border-purple-950/50 text-gray-400 hover:text-gray-300'
+                      }`}
+                    >
+                      {icon === 'Award' && <Award className="h-4 w-4" />}
+                      {icon === 'Heart' && <Heart className="h-4 w-4" />}
+                      {icon === 'Star' && <Star className="h-4 w-4" />}
+                      {icon === 'Code' && <Code className="h-4 w-4" />}
+                      {icon === 'Globe' && <Globe className="h-4 w-4" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Story selector */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Select Stories to Include</label>
+                {!user.stories || user.stories.length === 0 ? (
+                  <p className="text-[10px] text-gray-500 italic py-2">No active stories available. Please upload a story first.</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2.5 max-h-40 overflow-y-auto pr-1">
+                    {user.stories.map((story) => {
+                      const isSelected = selectedHighlightStories.includes(story.fileUrl);
+                      return (
+                        <div 
+                          key={story._id}
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedHighlightStories(selectedHighlightStories.filter(url => url !== story.fileUrl));
+                            } else {
+                              setSelectedHighlightStories([...selectedHighlightStories, story.fileUrl]);
+                            }
+                          }}
+                          className={`relative border aspect-[9/16] rounded-xl overflow-hidden cursor-pointer transition-all ${
+                            isSelected ? 'border-accent ring-2 ring-accent/30 scale-95' : 'border-purple-950/50 hover:border-purple-800'
+                          }`}
+                        >
+                          <img src={getFileUrl(story.fileUrl)} alt="Story Thumbnail" className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/35 flex items-center justify-center">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              readOnly
+                              className="accent-accent h-3.5 w-3.5 cursor-pointer rounded"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="pt-2 border-t border-purple-950/25 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setHighlightCreatorOpen(false)}
+                  className="flex-1 bg-purple-950/30 border border-purple-900/40 text-purple-300 py-2 rounded-xl text-xs font-bold transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-gradient-to-r from-accent to-accent-dark text-white py-2 rounded-xl text-xs font-bold hover:scale-[1.01] transition-all flex items-center justify-center"
+                >
+                  Create Highlight
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================= */}
+      {/* 🌟 CLOSE FRIENDS SELECTION MODAL          */}
+      {/* ======================================= */}
+      {closeFriendsModalOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#07050b]/80 backdrop-blur-md p-4">
+          <div className="w-full max-w-md bg-[#12111d] glass-panel border border-purple-950/40 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-purple-950/30 pb-3">
+              <h3 className="font-accent text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Star className="h-4.5 w-4.5 text-emerald-400 fill-emerald-500/25" /> Close Friends List
+              </h3>
+              <button
+                onClick={() => setCloseFriendsModalOpen(false)}
+                className="p-1.5 text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="text-[10px] text-gray-400 leading-normal mb-2">
+              Select users you follow to add to your Close Friends. Users in this list can see your Close Friends stories (green rings).
+            </p>
+
+            <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+              {!user.following || user.following.length === 0 ? (
+                <div className="text-center text-xs text-gray-500 py-6">You are not following anyone yet.</div>
+              ) : (
+                user.following.map((followedUser) => {
+                  const isCF = closeFriendsList.some(cfId => String(cfId._id || cfId) === String(followedUser._id));
+                  return (
+                    <div
+                      key={followedUser._id}
+                      className="flex items-center justify-between p-2.5 rounded-xl hover:bg-purple-950/20 border border-transparent hover:border-purple-900/35 transition-all"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-purple-900/40 border border-purple-800/40 overflow-hidden flex items-center justify-center font-bold text-xs text-purple-300 shrink-0">
+                          {followedUser.profilePicture ? (
+                            <img src={getFileUrl(followedUser.profilePicture)} alt={followedUser.name} className="w-full h-full object-cover" />
+                          ) : followedUser.name?.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-white truncate">{followedUser.name}</div>
+                          <div className="text-[9px] text-gray-500 truncate">{followedUser.email}</div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleToggleCloseFriend(followedUser._id)}
+                        className={`p-2 rounded-xl transition-all border flex items-center gap-1 text-[10px] font-bold ${
+                          isCF
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                            : 'bg-purple-950/30 border-purple-900/30 text-gray-500 hover:text-white'
+                        }`}
+                      >
+                        <Star className={`h-3.5 w-3.5 ${isCF ? 'fill-emerald-400' : ''}`} />
+                        {isCF ? 'Starred' : 'Add'}
+                      </button>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
