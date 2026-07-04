@@ -153,10 +153,7 @@ export default function UserDashboard() {
       const isGenuine = CERT_KEYWORDS.some(kw => ocrText.includes(kw));
 
       if (!isGenuine) {
-        setIsScanning(false);
-        setFile(null);
-        toast.error('AI Verification Failed: The document does not appear to be a genuine certificate or credential. Upload aborted.', { duration: 6000 });
-        return;
+        toast.success('Document scan completed. Ready for admin verification.', { id: 'scan-notif', duration: 4000 });
       }
 
       // 4. Smart Metadata Extraction
@@ -211,10 +208,7 @@ export default function UserDashboard() {
       const isGenuine = CERT_KEYWORDS.some(kw => filename.includes(kw));
 
       if (!isGenuine) {
-        setIsScanning(false);
-        setFile(null);
-        toast.error('Verification Error: Could not verify if the file is a genuine certificate. Upload aborted.', { duration: 6000 });
-        return;
+        toast.success('Document scan completed. Ready for admin verification.', { id: 'scan-notif-fn', duration: 4000 });
       }
 
       // Filename matches, allow fallback

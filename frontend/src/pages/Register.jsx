@@ -35,8 +35,7 @@ export default function Register() {
       });
 
       if (data.success) {
-        toast.success(data.message || 'Registration successful! You can now log in to your account.', { duration: 5000 });
-        navigate('/login');
+        navigate(`/login?message=${encodeURIComponent(data.message || 'Successfully registered! You can now log in.')}`);
       }
     } catch (error) {
       const msg = error.response?.data?.message || 'Registration failed. Try again.';

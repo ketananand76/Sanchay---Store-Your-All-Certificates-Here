@@ -259,6 +259,7 @@ const updateAdvancedProfile = async (req, res, next) => {
     user.gender = gender !== undefined ? gender : user.gender;
     user.privateAccount = privateAccount !== undefined ? privateAccount === 'true' || privateAccount === true : user.privateAccount;
     user.resumeUrl = resumeUrl !== undefined ? resumeUrl : user.resumeUrl;
+    user.role = req.body.role !== undefined ? req.body.role : user.role;
 
     // Links update
     if (user.links) {

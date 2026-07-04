@@ -14,7 +14,7 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['like', 'comment', 'follow', 'system', 'approval', 'reject'],
+      enum: ['like', 'comment', 'follow', 'system', 'approval', 'reject', 'apply', 'shortlisted', 'rejected', 'event', 'alert'],
       required: true,
     },
     message: {

@@ -29,8 +29,20 @@ export default function Navbar() {
     refetchInterval: 20000, // Poll every 20s as fallback
   });
 
-  // Query: Fetch direct message unread counts (DISABLED for Career platform)
-  const unreadChatTotal = 0;
+  // Query: Fetch direct message unread counts
+  const { data: chatUnreadData } = useQuery({
+    queryKey: ['chatUnreadCountsNavbar'],
+    queryFn: async () => {
+      const res = await api.get('/api/messages/unread/counts');
+      return res.data;
+    },
+    enabled: !!user,
+    refetchInterval: 15000,
+  });
+
+  const unreadChatTotal = chatUnreadData?.counts
+    ? Object.values(chatUnreadData.counts).reduce((acc, curr) => acc + curr, 0)
+    : 0;
   const unreadNotifCount = notifData?.unreadCount || 0;
 
   // Synthesize Sound Notification
@@ -86,7 +98,18 @@ export default function Navbar() {
       queryClient.invalidateQueries({ queryKey: ['notificationsCountNavbar'] });
     });
 
-    // Direct message socket listeners disabled for Career platform MVP
+    // Direct message socket listener
+    socket.on('receive-message', (msg) => {
+      // Don't toast if we are already in the chat page with this user
+      const isChatWithSender = location.pathname === '/chat' && location.search.includes(`user=${msg.sender}`);
+      if (!isChatWithSender) {
+        triggerAudioChime('chat');
+        toast(`New Message from ${msg.senderName || 'User'}: ${msg.content.slice(0, 30)}...`, { icon: '💬' });
+        queryClient.invalidateQueries({ queryKey: ['chatUnreadCountsNavbar'] });
+        queryClient.invalidateQueries({ queryKey: ['chatMessages'] });
+        queryClient.invalidateQueries({ queryKey: ['chatContacts'] });
+      }
+    });
 
     return () => {
       socket.disconnect();
@@ -206,6 +229,22 @@ export default function Navbar() {
                   </Link>
 
                   <Link
+                    to="/chat"
+                    className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all relative ${
+                      isActive('/chat') 
+                        ? 'bg-purple-600/10 text-accent' 
+                        : 'text-gray-300 hover:text-white hover:bg-purple-950/20'
+                    }`}
+                  >
+                    <MessageSquare className="h-4 w-4 text-purple-400" /> Chat
+                    {unreadChatTotal > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-green-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full animate-pulse shadow-md">
+                        {unreadChatTotal}
+                      </span>
+                    )}
+                  </Link>
+
+                  <Link
                     to="/dashboard"
                     className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all ${
                       isActive('/dashboard') 
@@ -313,6 +352,22 @@ export default function Navbar() {
           >
             <Briefcase className="h-5 w-5" />
             <span>Jobs</span>
+          </Link>
+
+          {/* Chat */}
+          <Link
+            to="/chat"
+            className={`flex flex-col items-center gap-0.5 text-[10px] font-bold relative ${
+              isActive('/chat') ? 'text-accent text-glow-purple' : 'text-gray-400'
+            }`}
+          >
+            <MessageSquare className="h-5 w-5" />
+            <span>Chat</span>
+            {unreadChatTotal > 0 && (
+              <span className="absolute -top-1 right-1 bg-green-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+                {unreadChatTotal}
+              </span>
+            )}
           </Link>
 
           {/* 4. Notifications */}

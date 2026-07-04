@@ -85,7 +85,8 @@ const { getChatMessages, markAsRead, getUnreadCounts } = require('./controllers/
 const { getNotifications, markAllAsRead } = require('./controllers/notificationController');
 const { 
   getUsersAndCertificates, approveCertificate, rejectCertificate, 
-  getAdminAlerts, deleteAlert, unblockUser 
+  getAdminAlerts, deleteAlert, unblockUser,
+  broadcastNotification, getActiveUsersLocations, updateUserLocation
 } = require('./controllers/adminMonitorController');
 const { requestPremium, getMyPaymentStatus, getPendingPayments, verifyPayment } = require('./controllers/paymentController');
 const { protectUser, restrictTo } = require('./middleware/authMiddleware');
@@ -118,33 +119,33 @@ app.delete('/api/social/comment/:certId/:commentId', protectUser, deleteComment)
 app.put('/api/social/profile', protectUser, upload.single('file'), updateAdvancedProfile);
 app.delete('/api/social/profile', protectUser, deleteAccount);
 app.get('/api/social/users', protectUser, getAllUsers);
-app.get('/api/social/profile/:id', protectUser, getUserProfile);
+app.get('/api/social/profile/:id', getUserProfile);
 app.post('/api/social/report-abusive', protectUser, reportAbusiveLanguage);
 
-// 4. Message / Chat routes (DISABLED for Job/Career Platform MVP phase)
-// app.get('/api/messages/unread/counts', protectUser, getUnreadCounts);
-// app.get('/api/messages/:userId', protectUser, getChatMessages);
-// app.put('/api/messages/:userId/read', protectUser, markAsRead);
+// 4. Message / Chat routes
+app.get('/api/messages/unread/counts', protectUser, getUnreadCounts);
+app.get('/api/messages/:userId', protectUser, getChatMessages);
+app.put('/api/messages/:userId/read', protectUser, markAsRead);
 app.get('/api/notifications', protectUser, getNotifications);
 app.put('/api/notifications/read', protectUser, markAllAsRead);
-// app.post('/api/messages/upload', protectUser, upload.single('file'), async (req, res, next) => {
-//   try {
-//     if (!req.file) {
-//       return res.status(400).json({ success: false, message: 'No file uploaded' });
-//     }
-//     const { uploadToCloudinary } = require('./config/cloudinary');
-//     const cloudinaryResult = await uploadToCloudinary(req.file.path);
-//     let fileUrl = '';
-//     if (cloudinaryResult) {
-//       fileUrl = cloudinaryResult.url;
-//     } else {
-//       fileUrl = `/uploads/${req.file.filename}`;
-//     }
-//     res.status(200).json({ success: true, fileUrl });
-//   } catch (error) {
-//     next(error);
-//   }
-// });
+app.post('/api/messages/upload', protectUser, upload.single('file'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+    const { uploadToCloudinary } = require('./config/cloudinary');
+    const cloudinaryResult = await uploadToCloudinary(req.file.path);
+    let fileUrl = '';
+    if (cloudinaryResult) {
+      fileUrl = cloudinaryResult.url;
+    } else {
+      fileUrl = `/uploads/${req.file.filename}`;
+    }
+    res.status(200).json({ success: true, fileUrl });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // 5. Admin Monitoring routes
 app.get('/api/admin/users-monitor', protect, getUsersAndCertificates);
@@ -153,6 +154,11 @@ app.put('/api/admin/certificates/:id/reject', protect, rejectCertificate);
 app.get('/api/admin/alerts', protect, getAdminAlerts);
 app.delete('/api/admin/alerts/:id', protect, deleteAlert);
 app.put('/api/admin/users/:userId/unblock', protect, unblockUser);
+app.post('/api/admin/broadcast', protect, broadcastNotification);
+app.get('/api/admin/active-locations', protect, getActiveUsersLocations);
+
+// User location tracking route
+app.post('/api/users/update-location', protectUser, updateUserLocation);
 
 // 6. Certificate public routes
 app.get('/api/certificates', getCertificates);

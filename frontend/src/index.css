@@ -447,4 +447,140 @@
   border: 1px solid rgba(168, 85, 247, 0.15);
 }
 
+/* ======================================================== */
+/* ☀️ LIGHT THEME GLOBAL OVERRIDES & Design Adapters        */
+/* ======================================================== */
+[data-theme="light"],
+[data-theme="emerald"],
+[data-theme="cyberpunk"],
+[data-theme="saffron"],
+[data-theme="slate"] {
+  /* Override hardcoded page-level backgrounds */
+  .bg-\[\#0a0a0f\],
+  .bg-\[\#09080f\],
+  .bg-\[\#09080e\],
+  .bg-\[\#07050d\],
+  .bg-\[\#050409\],
+  .bg-\[\#040307\],
+  .bg-\[\#0d0c15\],
+  .bg-\[\#0d0a15\]\/80,
+  .bg-dark-bg {
+    background-color: var(--color-bg) !important;
+  }
+
+  /* Override hardcoded card-level backgrounds */
+  .bg-\[\#0c0a13\],
+  .bg-\[\#12111d\],
+  .bg-\[\#121020\],
+  .bg-\[\#120f26\],
+  .bg-\[\#151425\],
+  .bg-\[\#0c0a13\]\/70,
+  .bg-\[\#0c0a13\]\/60,
+  .bg-\[\#12111d\]\/50,
+  .bg-\[\#12111d\]\/75,
+  .bg-\[\#12111d\]\/90,
+  .bg-\[\#050409\]\/80,
+  .bg-\[\#09080e\]\/90,
+  .bg-\[\#000\],
+  .bg-black\/40 {
+    background-color: var(--color-card, rgba(255, 255, 255, 0.85)) !important;
+  }
+
+  /* Override hardcoded text colors to ensure readability */
+  .text-white,
+  .text-slate-100,
+  .text-slate-200,
+  .text-slate-300,
+  .text-gray-100,
+  .text-gray-200,
+  .text-gray-300,
+  .text-gray-350,
+  .text-purple-100,
+  .text-purple-200 {
+    color: var(--color-text, #1e293b) !important;
+  }
+
+  .text-slate-400,
+  .text-slate-500,
+  .text-gray-400,
+  .text-gray-500,
+  .text-gray-600 {
+    color: #475569 !important; /* Muted slate dark grey for readability */
+  }
+
+  .text-purple-300,
+  .text-purple-400 {
+    color: var(--color-accent, #7c3aed) !important;
+  }
+
+  /* Forms and Inputs */
+  input,
+  select,
+  textarea {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+    border-color: rgba(124, 58, 237, 0.25) !important;
+  }
+  
+  input:focus,
+  select:focus,
+  textarea:focus {
+    border-color: var(--color-accent) !important;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15) !important;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #94a3b8 !important;
+  }
+
+  /* Specific component adjustments */
+  .glass-panel {
+    background: var(--color-card, rgba(255, 255, 255, 0.85)) !important;
+    border-color: var(--color-border, rgba(124, 58, 237, 0.15)) !important;
+    box-shadow: 0 10px 30px rgba(124, 58, 237, 0.04) !important;
+  }
+
+  .glass-panel-gold {
+    background: rgba(255, 255, 255, 0.9) !important;
+    border-color: rgba(212, 175, 55, 0.4) !important;
+    box-shadow: 0 10px 30px rgba(212, 175, 55, 0.05) !important;
+  }
+
+  .glass-card-dark {
+    background: var(--color-card, rgba(255, 255, 255, 0.85)) !important;
+    border-color: var(--color-border, rgba(124, 58, 237, 0.15)) !important;
+  }
+
+  /* Border overrides */
+  .border-purple-950\/40,
+  .border-purple-950\/20,
+  .border-purple-950\/80,
+  .border-purple-900\/60,
+  .border-purple-900\/40,
+  .border-purple-900\/30,
+  .border-purple-950\/30 {
+    border-color: var(--color-border, rgba(124, 58, 237, 0.12)) !important;
+  }
+
+  /* Title text */
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--color-text, #0f172a) !important;
+  }
+
+  /* Glow effects override */
+  .text-glow-purple, .text-glow-cyan {
+    text-shadow: none !important;
+  }
+}
+
+/* Radar Sweep Animation */
+@keyframes spin-radar {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin-radar {
+  animation: spin-radar 6s linear infinite;
+}
+
 

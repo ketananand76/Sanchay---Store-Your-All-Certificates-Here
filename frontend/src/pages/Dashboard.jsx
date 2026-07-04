@@ -6,17 +6,26 @@ import { io } from 'socket.io-client';
 import { 
   Plus, Edit2, Trash2, Star, ChevronLeft, ChevronRight, Loader2, Award, 
   Search, ExternalLink, Folder, FolderOpen, ShieldCheck, Check, X, 
-  ShieldAlert, Users, Clock, CheckCircle2, ArrowLeft, RefreshCw, AlertTriangle
+  ShieldAlert, Users, Clock, CheckCircle2, ArrowLeft, RefreshCw, AlertTriangle,
+  Globe, Activity, Megaphone, Signal, MapPin, Compass, Send
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
   
-  // Tab states: 'folders' | 'approvals' | 'alerts' | 'payments'
+  // Tab states: 'folders' | 'approvals' | 'alerts' | 'payments' | 'broadcast' | 'monitor'
   const [activeTab, setActiveTab] = useState('folders');
   const [folderSearch, setFolderSearch] = useState('');
   const [selectedFolderUser, setSelectedFolderUser] = useState(null);
+
+  // Broadcast Panel States
+  const [broadcastMsg, setBroadcastMsg] = useState('');
+  const [broadcastType, setBroadcastType] = useState('system');
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+
+  // System Monitor States
+  const [mapCenterUser, setMapCenterUser] = useState(null);
 
   // Futuristic admin command console CLI states
   const [cliInput, setCliInput] = useState('');
@@ -96,6 +105,16 @@ export default function Dashboard() {
     },
   });
 
+  // Query: active locations
+  const { data: locationsData, isLoading: loadingLocations } = useQuery({
+    queryKey: ['adminActiveLocations'],
+    queryFn: async () => {
+      const res = await api.get('/api/admin/active-locations');
+      return res.data.users;
+    },
+    refetchInterval: 10000, // Poll every 10s for active tracking updates
+  });
+
   // Query: pending certificates
   const { data: pendingData, isLoading: loadingPending, error: pendingError } = useQuery({
     queryKey: ['pendingCertificates'],
@@ -142,6 +161,11 @@ export default function Dashboard() {
       // Invalidate queries to refresh the views
       queryClient.invalidateQueries({ queryKey: ['adminAlerts'] });
       queryClient.invalidateQueries({ queryKey: ['adminUsersMonitor'] });
+    });
+
+    socket.on('user-location-updated', (data) => {
+      toast.success(`🌐 User Tracking: ${data.name} active from ${data.location.city}, ${data.location.country}`, { duration: 6000, icon: '📍' });
+      queryClient.invalidateQueries({ queryKey: ['adminActiveLocations'] });
     });
 
     return () => {
@@ -364,30 +388,30 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         <div className="lg:col-span-8 space-y-6">
           {/* Tab Navigation header */}
-      <div className="flex border-b border-purple-950/40 mb-6 w-full">
+      <div className="flex flex-wrap border-b border-purple-950/40 mb-6 w-full gap-y-2">
         <button
           onClick={() => { setSelectedFolderUser(null); setActiveTab('folders'); }}
-          className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
+          className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all min-w-[120px] ${
             activeTab === 'folders'
               ? 'border-accent text-accent'
               : 'border-transparent text-gray-500 hover:text-gray-300'
           }`}
         >
-          📁 User Directories ({monitorData?.length || 0})
+          📁 Directories ({monitorData?.length || 0})
         </button>
         <button
           onClick={() => { setSelectedFolderUser(null); setActiveTab('approvals'); }}
-          className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
+          className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all min-w-[120px] ${
             activeTab === 'approvals'
               ? 'border-accent text-accent'
               : 'border-transparent text-gray-500 hover:text-gray-300'
           }`}
         >
-          📥 Action Queue ({pendingData?.certificates?.length || 0})
+          📥 Review Queue ({pendingData?.certificates?.length || 0})
         </button>
         <button
           onClick={() => { setSelectedFolderUser(null); setActiveTab('alerts'); }}
-          className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all flex items-center justify-center gap-1.5 ${
+          className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all flex items-center justify-center gap-1.5 min-w-[100px] ${
             activeTab === 'alerts'
               ? 'border-accent text-accent'
               : 'border-transparent text-gray-500 hover:text-gray-300'
@@ -395,14 +419,14 @@ export default function Dashboard() {
         >
           <span>⚠️ Alerts</span>
           {alertsData?.length > 0 && (
-            <span className="bg-red-650 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+            <span className="bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
               {alertsData.length}
             </span>
           )}
         </button>
         <button
           onClick={() => { setSelectedFolderUser(null); setActiveTab('payments'); }}
-          className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all flex items-center justify-center gap-1.5 ${
+          className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all flex items-center justify-center gap-1.5 min-w-[100px] ${
             activeTab === 'payments'
               ? 'border-accent text-accent'
               : 'border-transparent text-gray-500 hover:text-gray-300'
@@ -414,6 +438,26 @@ export default function Dashboard() {
               {pendingPayments.length}
             </span>
           )}
+        </button>
+        <button
+          onClick={() => { setSelectedFolderUser(null); setActiveTab('broadcast'); }}
+          className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all flex items-center justify-center gap-1.5 min-w-[120px] ${
+            activeTab === 'broadcast'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-gray-500 hover:text-gray-300'
+          }`}
+        >
+          <Megaphone className="h-3.5 w-3.5" /> Broadcast
+        </button>
+        <button
+          onClick={() => { setSelectedFolderUser(null); setActiveTab('monitor'); }}
+          className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all flex items-center justify-center gap-1.5 min-w-[120px] ${
+            activeTab === 'monitor'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-gray-500 hover:text-gray-300'
+          }`}
+        >
+          <Globe className="h-3.5 w-3.5 text-cyan-400" /> Monitor
         </button>
       </div>
 
@@ -895,6 +939,345 @@ export default function Dashboard() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ========================================== */}
+      {/* 📢 TAB: BROADCAST CENTER                  */}
+      {/* ========================================== */}
+      {activeTab === 'broadcast' && (
+        <div className="space-y-6">
+          <div className="glass-panel p-6 rounded-2xl border-purple-950/40 bg-[#0c0a13]/70 space-y-4">
+            <div className="flex items-center gap-2 border-b border-purple-950/30 pb-3">
+              <Megaphone className="h-5 w-5 text-accent animate-pulse" />
+              <h3 className="font-accent text-sm font-bold text-white uppercase tracking-wider">System-Wide Broadcast Center</h3>
+            </div>
+            
+            <p className="text-xs text-gray-400 leading-relaxed text-left">
+              Publish critical alerts, scheduled system updates, or platform-wide events to all active users. Users will receive real-time audio chime notifications and see them in their alerts feed.
+            </p>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!broadcastMsg.trim()) return toast.error('Please enter a broadcast message');
+                
+                setIsBroadcasting(true);
+                try {
+                  const res = await api.post('/api/admin/broadcast', {
+                    type: broadcastType,
+                    message: broadcastMsg
+                  });
+                  if (res.data.success) {
+                    toast.success('Broadcast sent successfully!', { icon: '📢' });
+                    setBroadcastMsg('');
+                  }
+                } catch (err) {
+                  toast.error(err.response?.data?.message || 'Broadcast failed to dispatch');
+                } finally {
+                  setIsBroadcasting(false);
+                }
+              }}
+              className="space-y-4 text-left"
+            >
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-gray-500">Alert Category</label>
+                <select
+                  value={broadcastType}
+                  onChange={(e) => setBroadcastType(e.target.value)}
+                  className="w-full bg-[#07050d] border border-purple-950/80 focus:border-accent text-xs text-gray-200 px-3 py-2.5 rounded-lg focus:outline-none cursor-pointer"
+                >
+                  <option value="system">🔧 System Alert (Maintenance, Version update)</option>
+                  <option value="event">📅 Platform Event (Hiring hackathons, webinars)</option>
+                  <option value="alert">⚠️ Critical Security Warning (Guideline updates)</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-gray-500">Broadcast Message</label>
+                <textarea
+                  rows="4"
+                  value={broadcastMsg}
+                  onChange={(e) => setBroadcastMsg(e.target.value)}
+                  placeholder="Enter the message detail here... E.g., 'Maintenance downtime scheduled for Sunday 2 AM UTC.'"
+                  className="w-full bg-[#07050d] border border-purple-950/80 focus:border-accent text-xs text-gray-200 px-3 py-2.5 rounded-lg focus:outline-none resize-none"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isBroadcasting}
+                className="w-full bg-gradient-to-r from-accent to-accent-dark hover:from-accent-dark hover:to-accent text-white font-bold py-2.5 rounded-xl shadow-lg shadow-purple-500/10 flex items-center justify-center gap-2 hover:scale-[1.01] transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {isBroadcasting ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Dispatching Broadcast...</>
+                ) : (
+                  <><Send className="h-4 w-4" /> Send Broadcast to All Users</>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================== */}
+      {/* 🌐 TAB: SYSTEM MONITOR (Charts & Earth Map)*/}
+      {/* ========================================== */}
+      {activeTab === 'monitor' && (
+        <div className="space-y-6">
+          
+          {/* Section: World Map Radar Tracker */}
+          <div className="glass-panel p-6 rounded-2xl border-purple-950/40 bg-[#0c0a13]/70 space-y-4">
+            <div className="flex items-center justify-between border-b border-purple-950/30 pb-3">
+              <div className="flex items-center gap-2">
+                <Globe className="h-5 w-5 text-cyan-400 animate-spin-slow" />
+                <h3 className="font-accent text-sm font-bold text-white uppercase tracking-wider">Active Geolocation Radar Tracker</h3>
+              </div>
+              <span className="text-[10px] bg-cyan-950/35 border border-cyan-800/40 text-cyan-400 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-ping"></span> Live Signal Active
+              </span>
+            </div>
+
+            {/* SVG WORLD MAP VIEW */}
+            <div className="w-full h-80 bg-[#06050b]/90 border border-purple-950/50 rounded-2xl relative overflow-hidden flex items-center justify-center shadow-inner">
+              
+              {/* Radar Scanner Overlay */}
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.03)_0%,transparent_70%)] pointer-events-none"></div>
+              <div className="absolute inset-0 border border-cyan-500/5 rounded-full pointer-events-none w-[90%] h-[90%] m-auto animate-pulse"></div>
+              <div className="absolute inset-0 border border-cyan-500/5 rounded-full pointer-events-none w-[60%] h-[60%] m-auto"></div>
+              <div className="absolute inset-0 border border-cyan-500/5 rounded-full pointer-events-none w-[30%] h-[30%] m-auto"></div>
+
+              {/* Simplified high-tech SVG map layout grid */}
+              <svg viewBox="0 0 1000 500" className="w-full h-full opacity-65">
+                {/* Horizontal Coordinate Grid Lines */}
+                <line x1="0" y1="83" x2="1000" y2="83" stroke="rgba(168, 85, 247, 0.04)" strokeDasharray="3,3" />
+                <line x1="0" y1="166" x2="1000" y2="166" stroke="rgba(168, 85, 247, 0.04)" strokeDasharray="3,3" />
+                <line x1="0" y1="250" x2="1000" y2="250" stroke="rgba(168, 85, 247, 0.06)" />
+                <line x1="0" y1="333" x2="1000" y2="333" stroke="rgba(168, 85, 247, 0.04)" strokeDasharray="3,3" />
+                <line x1="0" y1="416" x2="1000" y2="416" stroke="rgba(168, 85, 247, 0.04)" strokeDasharray="3,3" />
+                {/* Vertical Grid Lines */}
+                <line x1="166" y1="0" x2="166" y2="500" stroke="rgba(168, 85, 247, 0.04)" strokeDasharray="3,3" />
+                <line x1="333" y1="0" x2="333" y2="500" stroke="rgba(168, 85, 247, 0.04)" strokeDasharray="3,3" />
+                <line x1="500" y1="0" x2="500" y2="500" stroke="rgba(168, 85, 247, 0.06)" />
+                <line x1="666" y1="0" x2="666" y2="500" stroke="rgba(168, 85, 247, 0.04)" strokeDasharray="3,3" />
+                <line x1="833" y1="0" x2="833" y2="500" stroke="rgba(168, 85, 247, 0.04)" strokeDasharray="3,3" />
+
+                {/* Continental outline polygons */}
+                {/* North America */}
+                <path d="M 120,80 L 220,90 L 280,120 L 300,160 L 250,210 L 200,240 L 160,250 L 170,220 L 140,190 L 120,130 Z" fill="rgba(168, 85, 247, 0.04)" stroke="rgba(168, 85, 247, 0.15)" strokeWidth="1" />
+                {/* South America */}
+                <path d="M 250,230 L 280,260 L 320,310 L 340,360 L 310,430 L 280,450 L 260,370 L 230,310 L 220,260 Z" fill="rgba(168, 85, 247, 0.04)" stroke="rgba(168, 85, 247, 0.15)" strokeWidth="1" />
+                {/* Eurasia */}
+                <path d="M 450,80 L 520,70 L 600,60 L 720,70 L 850,90 L 880,140 L 850,220 L 760,280 L 680,260 L 620,270 L 580,250 L 540,210 L 460,180 Z" fill="rgba(168, 85, 247, 0.04)" stroke="rgba(168, 85, 247, 0.15)" strokeWidth="1" />
+                {/* Africa */}
+                <path d="M 450,190 L 490,190 L 550,220 L 570,260 L 580,310 L 560,380 L 510,420 L 490,380 L 470,300 L 430,240 Z" fill="rgba(168, 85, 247, 0.04)" stroke="rgba(168, 85, 247, 0.15)" strokeWidth="1" />
+                {/* Australia */}
+                <path d="M 750,330 L 810,320 L 850,350 L 830,410 L 760,400 L 730,360 Z" fill="rgba(168, 85, 247, 0.04)" stroke="rgba(168, 85, 247, 0.15)" strokeWidth="1" />
+                {/* Greenland */}
+                <path d="M 290,30 L 360,40 L 340,70 L 300,60 Z" fill="rgba(168, 85, 247, 0.04)" stroke="rgba(168, 85, 247, 0.15)" strokeWidth="1" />
+              </svg>
+
+              {/* Pulsing geo-markers from Database active locations */}
+              {locationsData?.map((u) => {
+                const lat = u.location?.latitude || 0;
+                const lng = u.location?.longitude || 0;
+                
+                // Project 2D coordinates
+                const x = ((lng + 180) / 360) * 1000;
+                const y = ((90 - lat) / 180) * 500;
+
+                const isFocused = mapCenterUser && String(mapCenterUser._id) === String(u._id);
+
+                return (
+                  <div
+                    key={u._id}
+                    style={{ left: `${(x / 1000) * 100}%`, top: `${(y / 500) * 100}%` }}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 group cursor-pointer z-20"
+                    onClick={() => setMapCenterUser(u)}
+                  >
+                    {/* Ring Pulse */}
+                    <span className={`absolute inset-0 rounded-full w-5 h-5 -left-1.5 -top-1.5 animate-ping opacity-60 ${
+                      isFocused ? 'bg-cyan-400' : 'bg-accent'
+                    }`} />
+                    
+                    {/* Glowing Core Pin */}
+                    <div className={`w-2.5 h-2.5 rounded-full border border-white shadow-lg ${
+                      isFocused ? 'bg-cyan-400 shadow-cyan-500/50 scale-125 animate-pulse' : 'bg-accent shadow-purple-500/50'
+                    }`} />
+
+                    {/* Tooltip Overlay */}
+                    <div className="absolute left-1/2 bottom-5 -translate-x-1/2 w-48 p-2.5 rounded-xl bg-[#09080e]/95 border border-purple-950 text-left pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-2xl leading-tight">
+                      <p className="text-[10px] font-bold text-white">{u.name}</p>
+                      <p className="text-[8px] text-gray-500 uppercase mt-0.5">{u.role}</p>
+                      <p className="text-[9px] text-accent font-bold mt-1">📍 {u.location?.city || 'Unknown'}, {u.location?.country || 'Unknown'}</p>
+                      <p className="text-[7px] text-gray-600 font-mono mt-0.5">Lat: {lat.toFixed(4)} Lng: {lng.toFixed(4)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Centered tracking reticle indicator */}
+              {mapCenterUser && (
+                <div
+                  style={{
+                    left: `${(((mapCenterUser.location?.longitude || 0) + 180) / 360) * 100}%`,
+                    top: `${((90 - (mapCenterUser.location?.latitude || 0)) / 180) * 100}%`
+                  }}
+                  className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-30 flex items-center justify-center"
+                >
+                  <div className="w-12 h-12 border-2 border-dashed border-cyan-400 rounded-full animate-spin"></div>
+                  <div className="absolute w-2 h-2 bg-cyan-400 rounded-full animate-ping"></div>
+                </div>
+              )}
+            </div>
+
+            {/* List Table of active locations */}
+            <div className="space-y-2 mt-4 text-left">
+              <label className="text-[10px] uppercase font-bold text-gray-500">Live Active Feeds</label>
+              
+              {loadingLocations ? (
+                <div className="text-center py-6"><Loader2 className="h-6 w-6 animate-spin text-accent mx-auto" /></div>
+              ) : !locationsData || locationsData.length === 0 ? (
+                <div className="text-center text-xs text-gray-500 py-6">No location data captured. Users must log in to register coordinates.</div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-purple-950/20">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-purple-950/15 border-b border-purple-950/40 text-gray-400 font-bold uppercase text-[9px]">
+                        <th className="px-4 py-2.5">User</th>
+                        <th className="px-4 py-2.5">Active Location</th>
+                        <th className="px-4 py-2.5">Coordinates</th>
+                        <th className="px-4 py-2.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-purple-950/20 text-gray-300">
+                      {locationsData.map((u) => (
+                        <tr
+                          key={u._id}
+                          className={`hover:bg-[#12111d]/20 transition-all cursor-pointer ${
+                            mapCenterUser && String(mapCenterUser._id) === String(u._id) ? 'bg-cyan-950/10 text-cyan-400 font-bold' : ''
+                          }`}
+                          onClick={() => setMapCenterUser(u)}
+                        >
+                          <td className="px-4 py-2">
+                            <div>
+                              <p className="font-bold text-white text-[11px]">{u.name}</p>
+                              <p className="text-[8px] text-gray-500 uppercase">{u.role}</p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2">
+                            <span className="text-accent font-semibold">📍 {u.location?.city || 'Unknown City'}, {u.location?.country || 'Unknown Country'}</span>
+                          </td>
+                          <td className="px-4 py-2 font-mono text-[9px]">
+                            {u.location?.latitude?.toFixed(4)}, {u.location?.longitude?.toFixed(4)}
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setMapCenterUser(u); }}
+                              className="text-[9px] bg-cyan-950/30 border border-cyan-850 text-cyan-400 font-bold px-2 py-1 rounded hover:bg-cyan-900/30 transition-all uppercase tracking-wider cursor-pointer"
+                            >
+                              Track Geo
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Section: Analytics Dashboard Charts */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Chart 1: Signup Trends */}
+            <div className="glass-panel p-5 rounded-2xl border-purple-950/40 bg-[#0c0a13]/70 space-y-3 text-left">
+              <div className="flex items-center gap-1.5 border-b border-purple-950/20 pb-2">
+                <Activity className="h-4 w-4 text-purple-400" />
+                <h4 className="font-accent text-[11px] font-bold text-white uppercase tracking-wider">User Signup Growth Index</h4>
+              </div>
+              
+              {/* Graphic Chart representation */}
+              <div className="h-32 w-full bg-[#050409]/60 border border-purple-950/30 rounded-xl relative overflow-hidden flex items-end p-2">
+                <svg className="w-full h-full" viewBox="0 0 300 100" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.45"/>
+                      <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.0"/>
+                    </linearGradient>
+                  </defs>
+                  
+                  {/* Grid Lines */}
+                  <line x1="0" y1="25" x2="300" y2="25" stroke="rgba(124, 58, 237, 0.05)" />
+                  <line x1="0" y1="50" x2="300" y2="50" stroke="rgba(124, 58, 237, 0.05)" />
+                  <line x1="0" y1="75" x2="300" y2="75" stroke="rgba(124, 58, 237, 0.05)" />
+
+                  {/* Bezier Line path */}
+                  <path d="M 0,90 Q 50,60 100,75 T 200,30 T 300,10 L 300,100 L 0,100 Z" fill="url(#chartGrad)" />
+                  <path d="M 0,90 Q 50,60 100,75 T 200,30 T 300,10" fill="none" stroke="#a78bfa" strokeWidth="2" />
+                  
+                  {/* Glowing Node dots */}
+                  <circle cx="100" cy="75" r="3" fill="#a78bfa" />
+                  <circle cx="200" cy="30" r="3" fill="#a78bfa" />
+                  <circle cx="300" cy="10" r="3" fill="#a78bfa" className="animate-pulse" />
+                </svg>
+                <div className="absolute top-2 right-2 text-[8px] bg-purple-950/45 border border-purple-900/50 text-purple-300 font-bold px-1.5 py-0.5 rounded">
+                  +134% Growth
+                </div>
+              </div>
+              <div className="flex justify-between text-[8px] text-gray-500 font-mono">
+                <span>May 2026</span>
+                <span>Jun 2026</span>
+                <span>Jul 2026 (Current)</span>
+              </div>
+            </div>
+
+            {/* Chart 2: Verification Activity */}
+            <div className="glass-panel p-5 rounded-2xl border-purple-950/40 bg-[#0c0a13]/70 space-y-3 text-left">
+              <div className="flex items-center gap-1.5 border-b border-purple-950/20 pb-2">
+                <ShieldCheck className="h-4 w-4 text-cyan-400" />
+                <h4 className="font-accent text-[11px] font-bold text-white uppercase tracking-wider">Credential Verification Volume</h4>
+              </div>
+
+              {/* Bar Chart Representation */}
+              <div className="h-32 w-full bg-[#050409]/60 border border-purple-950/30 rounded-xl relative flex items-end justify-around px-4 pb-2">
+                
+                {/* Horizontal Guide Lines */}
+                <div className="absolute inset-x-0 top-1/4 border-b border-cyan-500/5"></div>
+                <div className="absolute inset-x-0 top-2/4 border-b border-cyan-500/5"></div>
+                <div className="absolute inset-x-0 top-3/4 border-b border-cyan-500/5"></div>
+
+                {/* Bars */}
+                {[30, 45, 60, 85, 95].map((val, idx) => (
+                  <div key={idx} className="flex flex-col items-center w-6 group z-10">
+                    <span className="text-[7px] text-cyan-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity mb-1 font-mono">
+                      {val}
+                    </span>
+                    <div
+                      style={{ height: `${val * 0.8}px` }}
+                      className="w-full bg-gradient-to-t from-cyan-600 to-cyan-400 rounded-t-md shadow-lg shadow-cyan-500/10 hover:brightness-110 transition-all cursor-pointer relative"
+                    >
+                      <div className="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity rounded-t-md"></div>
+                    </div>
+                  </div>
+                ))}
+                
+                <div className="absolute top-2 right-2 text-[8px] bg-cyan-950/45 border border-cyan-900/50 text-cyan-300 font-bold px-1.5 py-0.5 rounded">
+                  98.2% Accuracy
+                </div>
+              </div>
+              <div className="flex justify-between text-[8px] text-gray-500 font-mono px-2">
+                <span>IT</span>
+                <span>Finance</span>
+                <span>Design</span>
+                <span>Healthcare</span>
+                <span>Govt</span>
+              </div>
+            </div>
+
+          </div>
         </div>
       )}
         </div>

@@ -115,6 +115,13 @@ const userSchema = new mongoose.Schema(
         description: { type: String, default: '' },
       }
     ],
+    lastActiveLocation: {
+      latitude: { type: Number },
+      longitude: { type: Number },
+      city: { type: String, default: '' },
+      country: { type: String, default: '' },
+      lastActive: { type: Date, default: Date.now }
+    }
   },
   { timestamps: true }
 );

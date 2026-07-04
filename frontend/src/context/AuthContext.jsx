@@ -88,8 +88,67 @@ export const AuthProvider = ({ children }) => {
       setAdmin(null);
       setUser(null);
     }
-    return { success: true };
   };
+
+  const updateLocation = async () => {
+    try {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords;
+            let city = 'Unknown City';
+            let country = 'Unknown Country';
+            try {
+              const geoRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+              const geoData = await geoRes.json();
+              city = geoData.city || geoData.locality || city;
+              country = geoData.countryName || country;
+            } catch (err) {
+              console.warn('Reverse geocoding failed, using coordinates only');
+            }
+            await api.post('/api/users/update-location', {
+              latitude,
+              longitude,
+              city,
+              country,
+            });
+          },
+          async (error) => {
+            console.warn('Browser geolocation failed, falling back to IP', error.message);
+            await fetchIpLocation();
+          },
+          { timeout: 8000 }
+        );
+      } else {
+        await fetchIpLocation();
+      }
+    } catch (err) {
+      console.error('Failed to update active location tracker:', err);
+    }
+  };
+
+  const fetchIpLocation = async () => {
+    try {
+      const ipRes = await fetch('https://ipapi.co/json/');
+      const ipData = await ipRes.json();
+      if (ipData.latitude && ipData.longitude) {
+        await api.post('/api/users/update-location', {
+          latitude: ipData.latitude,
+          longitude: ipData.longitude,
+          city: ipData.city || 'Unknown City',
+          country: ipData.country_name || 'Unknown Country',
+        });
+      }
+    } catch (err) {
+      console.error('IP-based geolocation fallback failed:', err);
+    }
+  };
+
+  React.useEffect(() => {
+    if (user && user._id) {
+      updateLocation();
+    }
+  }, [user?._id]);
 
   return (
     <AuthContext.Provider value={{ admin, user, loading, login, loginUser, logout, checkAuth }}>

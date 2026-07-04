@@ -22,6 +22,13 @@ export default function UserProfile() {
   const isSelf = currentUser && String(currentUser._id) === String(id);
   const isAdmin = !!admin;
 
+  // Redirection healing for '/profile/undefined'
+  React.useEffect(() => {
+    if (id === 'undefined' && currentUser?._id) {
+      navigate(`/profile/${currentUser._id}`, { replace: true });
+    }
+  }, [id, currentUser, navigate]);
+
   // Settings state
   const [sName, setSName] = useState(currentUser?.name || '');
   const [sBio, setSBio] = useState(currentUser?.bio || '');
@@ -30,6 +37,15 @@ export default function UserProfile() {
   const [sWebsite, setSWebsite] = useState(currentUser?.links?.website || '');
   const [sGithub, setSGithub] = useState(currentUser?.links?.github || '');
   const [sLinkedin, setSLinkedin] = useState(currentUser?.links?.linkedin || '');
+  
+  // MERN Career Profile States
+  const [sRole, setSRole] = useState(currentUser?.role || 'Job Seeker');
+  const [sSkills, setSSkills] = useState(currentUser?.skills?.join(', ') || '');
+  const [sExperience, setSExperience] = useState(currentUser?.experience || []);
+  const [sEducation, setSEducation] = useState(currentUser?.education || []);
+  const [sResumeUrl, setSResumeUrl] = useState(currentUser?.resumeUrl || '');
+  const [sResumeFile, setSResumeFile] = useState(null);
+
   const [sPassword, setSPassword] = useState('');
   const [sConfirmPassword, setSConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -41,25 +57,105 @@ export default function UserProfile() {
   );
   const fileInputRef = useRef(null);
 
+  // Temporary Form States for Adding Experience / Education
+  const [expCompany, setExpCompany] = useState('');
+  const [expTitle, setExpTitle] = useState('');
+  const [expStartDate, setExpStartDate] = useState('');
+  const [expEndDate, setExpEndDate] = useState('');
+  const [expCurrent, setExpCurrent] = useState(false);
+  const [expDescription, setExpDescription] = useState('');
+  const [showAddExp, setShowAddExp] = useState(false);
+
+  const [eduSchool, setEduSchool] = useState('');
+  const [eduDegree, setEduDegree] = useState('');
+  const [eduFieldOfStudy, setEduFieldOfStudy] = useState('');
+  const [eduStartDate, setEduStartDate] = useState('');
+  const [eduEndDate, setEduEndDate] = useState('');
+  const [eduDescription, setEduDescription] = useState('');
+  const [showAddEdu, setShowAddEdu] = useState(false);
+
+  const handleAddExperience = () => {
+    if (!expCompany.trim() || !expTitle.trim()) {
+      return toast.error('Company and Job Title are required');
+    }
+    const newExp = {
+      company: expCompany.trim(),
+      title: expTitle.trim(),
+      startDate: expStartDate,
+      endDate: expCurrent ? 'Present' : expEndDate,
+      current: expCurrent,
+      description: expDescription.trim()
+    };
+    setSExperience([...sExperience, newExp]);
+    setExpCompany('');
+    setExpTitle('');
+    setExpStartDate('');
+    setExpEndDate('');
+    setExpCurrent(false);
+    setExpDescription('');
+    setShowAddExp(false);
+    toast.success('Experience added to drafts!');
+  };
+
+  const handleRemoveExperience = (index) => {
+    setSExperience(sExperience.filter((_, i) => i !== index));
+    toast.success('Experience removed');
+  };
+
+  const handleAddEducation = () => {
+    if (!eduSchool.trim() || !eduDegree.trim()) {
+      return toast.error('School and Degree are required');
+    }
+    const newEdu = {
+      school: eduSchool.trim(),
+      degree: eduDegree.trim(),
+      fieldOfStudy: eduFieldOfStudy.trim(),
+      startDate: eduStartDate,
+      endDate: eduEndDate,
+      description: eduDescription.trim()
+    };
+    setSEducation([...sEducation, newEdu]);
+    setEduSchool('');
+    setEduDegree('');
+    setEduFieldOfStudy('');
+    setEduStartDate('');
+    setEduEndDate('');
+    setEduDescription('');
+    setShowAddEdu(false);
+    toast.success('Education added to drafts!');
+  };
+
+  const handleRemoveEducation = (index) => {
+    setSEducation(sEducation.filter((_, i) => i !== index));
+    toast.success('Education removed');
+  };
+
   // Query: User profile + certificates
   const { data, isLoading, error } = useQuery({
     queryKey: ['userProfile', id],
     queryFn: async () => {
       const res = await api.get(`/api/social/profile/${id}`);
       return res.data;
-    },
-    onSuccess: (data) => {
-      if (isSelf) {
-        setSName(data.user.name || '');
-        setSBio(data.user.bio || '');
-        setSGender(data.user.gender || '');
-        setSPrivate(data.user.privateAccount || false);
-        setSWebsite(data.user.links?.website || '');
-        setSGithub(data.user.links?.github || '');
-        setSLinkedin(data.user.links?.linkedin || '');
-      }
     }
   });
+
+  // Sync settings inputs when data is loaded (TanStack Query v5 workaround)
+  React.useEffect(() => {
+    if (data?.user && isSelf) {
+      setSName(data.user.name || '');
+      setSBio(data.user.bio || '');
+      setSGender(data.user.gender || '');
+      setSPrivate(data.user.privateAccount || false);
+      setSWebsite(data.user.links?.website || '');
+      setSGithub(data.user.links?.github || '');
+      setSLinkedin(data.user.links?.linkedin || '');
+      setSRole(data.user.role || 'Job Seeker');
+      setSSkills(data.user.skills?.join(', ') || '');
+      setSExperience(data.user.experience || []);
+      setSEducation(data.user.education || []);
+      setSResumeUrl(data.user.resumeUrl || '');
+    }
+  }, [data, isSelf]);
 
   // Follow mutation
   const followMutation = useMutation({
@@ -124,19 +220,42 @@ export default function UserProfile() {
     if (!sName.trim()) return toast.error('Name cannot be empty');
     if (sPassword && sPassword !== sConfirmPassword) return toast.error('Passwords do not match');
 
-    const formData = new FormData();
-    formData.append('name', sName);
-    formData.append('bio', sBio);
-    formData.append('gender', sGender);
-    formData.append('privateAccount', sPrivate);
-    formData.append('website', sWebsite);
-    formData.append('github', sGithub);
-    formData.append('linkedin', sLinkedin);
-    if (sPassword) formData.append('password', sPassword);
-    if (sFile) formData.append('file', sFile);
-
     setIsUpdating(true);
     try {
+      let finalResumeUrl = sResumeUrl;
+
+      // Handle resume file upload separately to circumvent the single-file limit
+      if (sResumeFile) {
+        const resumeData = new FormData();
+        resumeData.append('file', sResumeFile);
+        resumeData.append('isResume', 'true');
+        const resumeRes = await api.put('/api/social/profile', resumeData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        if (resumeRes.data.success) {
+          finalResumeUrl = resumeRes.data.user.resumeUrl;
+        }
+      }
+
+      const formData = new FormData();
+      formData.append('name', sName);
+      formData.append('bio', sBio);
+      formData.append('gender', sGender);
+      formData.append('privateAccount', sPrivate);
+      formData.append('website', sWebsite);
+      formData.append('github', sGithub);
+      formData.append('linkedin', sLinkedin);
+      
+      // Append Career fields
+      formData.append('role', sRole);
+      formData.append('skills', JSON.stringify(sSkills.split(',').map(s => s.trim()).filter(Boolean)));
+      formData.append('experience', JSON.stringify(sExperience));
+      formData.append('education', JSON.stringify(sEducation));
+      formData.append('resumeUrl', finalResumeUrl);
+
+      if (sPassword) formData.append('password', sPassword);
+      if (sFile) formData.append('file', sFile);
+
       const res = await api.put('/api/social/profile', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -147,6 +266,7 @@ export default function UserProfile() {
         setSPassword('');
         setSConfirmPassword('');
         setSFile(null);
+        setSResumeFile(null);
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Update failed');
@@ -372,6 +492,27 @@ export default function UserProfile() {
               )}
             </div>
 
+            <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start -mt-1.5 mb-2.5">
+              <span className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-xl border ${
+                user.role === 'Employer' || user.role === 'HR Manager'
+                  ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-300'
+                  : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+              }`}>
+                <Briefcase className="h-3 w-3" /> {user.role || 'Job Seeker'}
+              </span>
+              
+              {user.resumeUrl && (
+                <a
+                  href={getFileUrl(user.resumeUrl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-xl border bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25 transition-all cursor-pointer"
+                >
+                  📄 View Resume
+                </a>
+              )}
+            </div>
+
             {/* Stats */}
             <div className="flex items-center justify-center sm:justify-start gap-6 border-y border-purple-950/20 py-2.5 text-xs">
               <div>
@@ -487,6 +628,88 @@ export default function UserProfile() {
           >
             <Settings className="h-3.5 w-3.5" /> Settings
           </button>
+        </div>
+      )}
+
+      {/* ======================================= */}
+      {/* PROFESSIONAL PORTFOLIO (Skills, Experience, Education) */}
+      {/* ======================================= */}
+      {(!isSelf || activeProfileTab === 'posts') && !isPrivate && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          
+          {/* Left Column: Skills & Info */}
+          <div className="space-y-6 md:col-span-1">
+            {user.skills && user.skills.length > 0 && (
+              <div className="glass-panel rounded-2xl p-5 border-purple-950/40 bg-[#0c0a13]/60">
+                <h3 className="font-accent text-xs font-bold text-purple-300 uppercase tracking-widest border-b border-purple-950/20 pb-2 mb-3 flex items-center gap-1.5">
+                  <Award className="h-4 w-4 text-accent" /> Key Expertise
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {user.skills.map((skill, idx) => (
+                    <span key={idx} className="bg-purple-950/40 border border-purple-900/50 text-purple-300 text-[10px] font-semibold px-2.5 py-1 rounded-lg">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column: Experience & Education Timeline */}
+          <div className="space-y-6 md:col-span-2">
+            {/* Experience timeline */}
+            {user.experience && user.experience.length > 0 && (
+              <div className="glass-panel rounded-2xl p-5 border-purple-950/40 bg-[#0c0a13]/60">
+                <h3 className="font-accent text-xs font-bold text-purple-300 uppercase tracking-widest border-b border-purple-950/20 pb-2 mb-4 flex items-center gap-1.5">
+                  <Briefcase className="h-4 w-4 text-accent" /> Work History
+                </h3>
+                <div className="space-y-5 border-l-2 border-purple-950/50 pl-4 ml-2">
+                  {user.experience.map((exp, idx) => (
+                    <div key={idx} className="relative group">
+                      {/* Timeline dot */}
+                      <div className="absolute -left-[23px] top-1.5 w-2.5 h-2.5 rounded-full bg-accent border-2 border-[#09080f] group-hover:scale-125 transition-transform" />
+                      <div className="space-y-1">
+                        <h4 className="text-xs font-bold text-white group-hover:text-accent transition-colors">{exp.title}</h4>
+                        <p className="text-[10px] font-semibold text-gray-300">{exp.company}</p>
+                        <p className="text-[9px] text-gray-500 font-medium">
+                          {exp.startDate} — {exp.current ? 'Present' : exp.endDate}
+                        </p>
+                        {exp.description && (
+                          <p className="text-[10px] text-gray-400 mt-1 leading-relaxed">{exp.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Education timeline */}
+            {user.education && user.education.length > 0 && (
+              <div className="glass-panel rounded-2xl p-5 border-purple-950/40 bg-[#0c0a13]/60">
+                <h3 className="font-accent text-xs font-bold text-purple-300 uppercase tracking-widest border-b border-purple-950/20 pb-2 mb-4 flex items-center gap-1.5">
+                  <Globe className="h-4 w-4 text-accent" /> Education & Qualifications
+                </h3>
+                <div className="space-y-5 border-l-2 border-purple-950/50 pl-4 ml-2">
+                  {user.education.map((edu, idx) => (
+                    <div key={idx} className="relative group">
+                      {/* Timeline dot */}
+                      <div className="absolute -left-[23px] top-1.5 w-2.5 h-2.5 rounded-full bg-accent border-2 border-[#09080f] group-hover:scale-125 transition-transform" />
+                      <div className="space-y-1">
+                        <h4 className="text-xs font-bold text-white group-hover:text-accent transition-colors">{edu.degree} in {edu.fieldOfStudy}</h4>
+                        <p className="text-[10px] font-semibold text-gray-300">{edu.school}</p>
+                        <p className="text-[9px] text-gray-500 font-medium">{edu.startDate} — {edu.endDate}</p>
+                        {edu.description && (
+                          <p className="text-[10px] text-gray-400 mt-1 leading-relaxed">{edu.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
       )}
 
@@ -703,6 +926,298 @@ export default function UserProfile() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* ---- Career Portfolio Settings ---- */}
+            <div className="glass-panel rounded-2xl p-5 border-purple-950/40 space-y-5 bg-[#0c0a13]/60">
+              <div className="flex items-center gap-2 border-b border-purple-950/30 pb-3">
+                <Briefcase className="h-4 w-4 text-accent" />
+                <h3 className="font-accent text-xs font-bold text-purple-300 uppercase tracking-widest">Career & Professional Profile</h3>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Role */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-gray-500">Professional Role</label>
+                  <select
+                    value={sRole}
+                    onChange={(e) => setSRole(e.target.value)}
+                    className="w-full bg-[#07050d] border border-purple-950/80 focus:border-accent text-xs text-gray-200 px-3 py-2.5 rounded-lg focus:outline-none cursor-pointer"
+                  >
+                    <option value="Job Seeker">💼 Job Seeker</option>
+                    <option value="Employer">🏢 Employer</option>
+                    <option value="HR Manager">🧑‍💼 HR Manager</option>
+                  </select>
+                </div>
+
+                {/* Skills */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-gray-500">Skills / Expertise (Comma Separated)</label>
+                  <input
+                    type="text"
+                    placeholder="React, Node.js, Python, Project Management"
+                    value={sSkills}
+                    onChange={(e) => setSSkills(e.target.value)}
+                    className="w-full bg-[#07050d] border border-purple-950/80 focus:border-accent text-xs text-gray-200 px-3 py-2.5 rounded-lg focus:outline-none"
+                  />
+                </div>
+
+                {/* Resume Upload */}
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="text-[10px] font-bold uppercase text-gray-500">Upload Resume (PDF format)</label>
+                  <div className="flex items-center gap-3">
+                    <label className="bg-purple-950/40 border border-purple-900/50 hover:bg-purple-900/30 text-purple-300 text-[10px] font-bold px-3 py-2 rounded-lg cursor-pointer flex items-center gap-1.5 transition-all">
+                      <Upload className="h-3 w-3" /> Select PDF
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            if (file.type !== 'application/pdf') {
+                              toast.error('Resume must be a PDF file');
+                              return;
+                            }
+                            setSResumeFile(file);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                    <div className="text-[10px] text-gray-400">
+                      {sResumeFile ? (
+                        <span className="text-emerald-400 font-semibold">Selected: {sResumeFile.name}</span>
+                      ) : sResumeUrl ? (
+                        <a href={getFileUrl(sResumeUrl)} target="_blank" rel="noopener noreferrer" className="text-purple-400 underline hover:text-purple-300">
+                          Current Resume Uploaded
+                        </a>
+                      ) : (
+                        <span>No resume uploaded yet</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* EXPERIENCE MANAGEMENT */}
+              <div className="space-y-3 pt-3 border-t border-purple-950/20">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider flex justify-between items-center">
+                  <span>Work Experience</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddExp(!showAddExp)}
+                    className="text-[10px] bg-accent/25 hover:bg-accent/40 text-purple-300 border border-purple-900/60 px-2 py-1 rounded transition-all cursor-pointer"
+                  >
+                    {showAddExp ? 'Cancel' : '+ Add Work'}
+                  </button>
+                </h4>
+
+                {/* Experience Draft Items */}
+                {sExperience.length > 0 && (
+                  <div className="space-y-2">
+                    {sExperience.map((exp, idx) => (
+                      <div key={idx} className="flex justify-between items-start bg-purple-950/15 border border-purple-950/40 p-3 rounded-xl">
+                        <div className="text-[11px]">
+                          <p className="font-bold text-white">{exp.title} at {exp.company}</p>
+                          <p className="text-gray-400 text-[10px]">{exp.startDate} - {exp.endDate}</p>
+                          {exp.description && <p className="text-gray-500 text-[10px] mt-1">{exp.description}</p>}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveExperience(idx)}
+                          className="text-red-400 hover:text-red-300 text-[10px] font-bold p-1 cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Experience Inline Form */}
+                {showAddExp && (
+                  <div className="bg-purple-950/20 border border-purple-900/30 p-4 rounded-xl space-y-3 animate-float-up text-left">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-gray-500">Company Name *</label>
+                        <input
+                          type="text"
+                          value={expCompany}
+                          onChange={(e) => setExpCompany(e.target.value)}
+                          className="w-full bg-[#050409] border border-purple-950/80 focus:border-accent text-xs text-gray-200 px-2.5 py-1.5 rounded-lg focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-gray-500">Job Title *</label>
+                        <input
+                          type="text"
+                          value={expTitle}
+                          onChange={(e) => setExpTitle(e.target.value)}
+                          className="w-full bg-[#050409] border border-purple-950/80 focus:border-accent text-xs text-gray-200 px-2.5 py-1.5 rounded-lg focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-gray-500">Start Date</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. June 2022"
+                          value={expStartDate}
+                          onChange={(e) => setExpStartDate(e.target.value)}
+                          className="w-full bg-[#050409] border border-purple-950/80 focus:border-accent text-xs text-gray-200 px-2.5 py-1.5 rounded-lg focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-gray-500">End Date</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Present / Aug 2024"
+                          disabled={expCurrent}
+                          value={expCurrent ? '' : expEndDate}
+                          onChange={(e) => setExpEndDate(e.target.value)}
+                          className="w-full bg-[#050409] border border-purple-950/80 focus:border-accent text-xs text-gray-200 px-2.5 py-1.5 rounded-lg focus:outline-none disabled:opacity-40"
+                        />
+                      </div>
+                      <div className="sm:col-span-2 flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="expCurrentCheck"
+                          checked={expCurrent}
+                          onChange={(e) => setExpCurrent(e.target.checked)}
+                          className="rounded border-purple-950 bg-[#050409] text-accent focus:ring-accent"
+                        />
+                        <label htmlFor="expCurrentCheck" className="text-[10px] text-gray-300 font-semibold cursor-pointer">
+                          I currently work here
+                        </label>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-[9px] uppercase font-bold text-gray-500">Role Description</label>
+                        <textarea
+                          rows="2"
+                          value={expDescription}
+                          onChange={(e) => setExpDescription(e.target.value)}
+                          className="w-full bg-[#050409] border border-purple-950/80 focus:border-accent text-xs text-gray-200 px-2.5 py-1.5 rounded-lg focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddExperience}
+                      className="bg-accent hover:bg-accent-dark text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                    >
+                      Add Experience Draft
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* EDUCATION MANAGEMENT */}
+              <div className="space-y-3 pt-3 border-t border-purple-950/20">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider flex justify-between items-center">
+                  <span>Education & Qualifications</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddEdu(!showAddEdu)}
+                    className="text-[10px] bg-accent/25 hover:bg-accent/40 text-purple-300 border border-purple-900/60 px-2 py-1 rounded transition-all cursor-pointer"
+                  >
+                    {showAddEdu ? 'Cancel' : '+ Add Edu'}
+                  </button>
+                </h4>
+
+                {/* Education Draft Items */}
+                {sEducation.length > 0 && (
+                  <div className="space-y-2">
+                    {sEducation.map((edu, idx) => (
+                      <div key={idx} className="flex justify-between items-start bg-purple-950/15 border border-purple-950/40 p-3 rounded-xl">
+                        <div className="text-[11px]">
+                          <p className="font-bold text-white">{edu.degree} in {edu.fieldOfStudy}</p>
+                          <p className="text-gray-400 text-[10px]">{edu.school} ({edu.startDate} - {edu.endDate})</p>
+                          {edu.description && <p className="text-gray-500 text-[10px] mt-1">{edu.description}</p>}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEducation(idx)}
+                          className="text-red-400 hover:text-red-300 text-[10px] font-bold p-1 cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Education Inline Form */}
+                {showAddEdu && (
+                  <div className="bg-purple-950/20 border border-purple-900/30 p-4 rounded-xl space-y-3 animate-float-up text-left">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-gray-500">School / University *</label>
+                        <input
+                          type="text"
+                          value={eduSchool}
+                          onChange={(e) => setEduSchool(e.target.value)}
+                          className="w-full bg-[#050409] border border-purple-950/80 focus:border-accent text-xs text-gray-200 px-2.5 py-1.5 rounded-lg focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-gray-500">Degree *</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Bachelor of Science"
+                          value={eduDegree}
+                          onChange={(e) => setEduDegree(e.target.value)}
+                          className="w-full bg-[#050409] border border-purple-950/80 focus:border-accent text-xs text-gray-200 px-2.5 py-1.5 rounded-lg focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-gray-500">Field of Study</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Computer Science"
+                          value={eduFieldOfStudy}
+                          onChange={(e) => setEduFieldOfStudy(e.target.value)}
+                          className="w-full bg-[#050409] border border-purple-950/80 focus:border-accent text-xs text-gray-200 px-2.5 py-1.5 rounded-lg focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-gray-500">Start Date</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 2020"
+                          value={eduStartDate}
+                          onChange={(e) => setEduStartDate(e.target.value)}
+                          className="w-full bg-[#050409] border border-purple-950/80 focus:border-accent text-xs text-gray-200 px-2.5 py-1.5 rounded-lg focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-gray-500">End Date</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 2024 / Present"
+                          value={eduEndDate}
+                          onChange={(e) => setEduEndDate(e.target.value)}
+                          className="w-full bg-[#050409] border border-purple-950/80 focus:border-accent text-xs text-gray-200 px-2.5 py-1.5 rounded-lg focus:outline-none"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-[9px] uppercase font-bold text-gray-500">Description / Honors</label>
+                        <textarea
+                          rows="2"
+                          value={eduDescription}
+                          onChange={(e) => setEduDescription(e.target.value)}
+                          className="w-full bg-[#050409] border border-purple-950/80 focus:border-accent text-xs text-gray-200 px-2.5 py-1.5 rounded-lg focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddEducation}
+                      className="bg-accent hover:bg-accent-dark text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                    >
+                      Add Education Draft
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
