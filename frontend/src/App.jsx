@@ -29,6 +29,7 @@ import UserSearch from './pages/UserSearch';
 import Chat from './pages/Chat';
 import Notifications from './pages/Notifications';
 import Jobs from './pages/Jobs';
+import Premium from './pages/Premium';
 
 // Initialize React Query Client
 const queryClient = new QueryClient({
@@ -42,9 +43,9 @@ const queryClient = new QueryClient({
 
 function AppLayout({ children }) {
   return (
-    <div className="flex flex-col min-h-screen relative bg-dark-bg">
+    <div className="flex flex-col min-h-screen relative">
       {/* Decorative vector background */}
-      <div className="absolute inset-0 bg-mandala-pattern bg-center pointer-events-none opacity-25"></div>
+      <div className="absolute inset-0 bg-mandala-pattern bg-center pointer-events-none opacity-5"></div>
       
       <Navbar />
       <main className="flex-1 w-full relative z-10 pb-20 md:pb-0">{children}</main>
@@ -126,6 +127,16 @@ export default function App() {
               element={
                 <AppLayout>
                   <UserDashboard />
+                </AppLayout>
+              }
+            />
+
+            {/* Premium Upgrade Portal */}
+            <Route
+              path="/premium"
+              element={
+                <AppLayout>
+                  <Premium />
                 </AppLayout>
               }
             />

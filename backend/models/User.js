@@ -60,15 +60,6 @@ const userSchema = new mongoose.Schema(
       type: Object,
       default: null,
     },
-    isVerified: {
-      type: Boolean,
-    },
-    verificationToken: {
-      type: String,
-    },
-    verificationTokenExpires: {
-      type: Date,
-    },
     status: {
       type: String,
       enum: ['active', 'blocked'],
@@ -83,6 +74,17 @@ const userSchema = new mongoose.Schema(
     },
     verificationTokenExpires: {
       type: Date,
+    },
+    isPremium: {
+      type: Boolean,
+      default: false,
+    },
+    premiumExpiresAt: {
+      type: Date,
+    },
+    aiScansCount: {
+      type: Number,
+      default: 0,
     },
   },
   { timestamps: true }

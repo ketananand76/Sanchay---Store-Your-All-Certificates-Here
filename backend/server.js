@@ -87,6 +87,7 @@ const {
   getUsersAndCertificates, approveCertificate, rejectCertificate, 
   getAdminAlerts, deleteAlert, unblockUser 
 } = require('./controllers/adminMonitorController');
+const { requestPremium, getMyPaymentStatus, getPendingPayments, verifyPayment } = require('./controllers/paymentController');
 const { protectUser } = require('./middleware/authMiddleware');
 
 // Serve local static files
@@ -169,6 +170,12 @@ app.get('/api/jobs', protectUser, getJobs);
 app.post('/api/jobs', protectUser, createJob);
 app.post('/api/jobs/:id/apply', protectUser, applyJob);
 app.delete('/api/jobs/:id', protectUser, deleteJob);
+
+// 9. Payment & Premium routes
+app.post('/api/payments/request', protectUser, requestPremium);
+app.get('/api/payments/my-status', protectUser, getMyPaymentStatus);
+app.get('/api/payments/admin/pending', protect, getPendingPayments);
+app.put('/api/payments/admin/:id/verify', protect, verifyPayment);
 
 // Centralized error handler
 app.use(errorHandler);

@@ -196,10 +196,30 @@ const uploadUserCertificate = async (req, res, next) => {
       throw new Error('Required fields: title, issuer, dateIssued, category');
     }
 
+    // Check scanner/upload limit for free users
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+
+    const isPremiumActive = user.isPremium && user.premiumExpiresAt && new Date(user.premiumExpiresAt) > new Date();
+    if (!isPremiumActive) {
+      const count = await Certificate.countDocuments({ uploadedBy: req.user.id });
+      if (count >= 3) {
+        res.status(403);
+        throw new Error('Free account scan limit reached (Max 3 certificates). Please upgrade to Premium to upload unlimited certificates.');
+      }
+    }
+
     if (!req.file) {
       res.status(400);
       throw new Error('Please upload a certificate document');
     }
+
+    // Increment AI scan count
+    user.aiScansCount = (user.aiScansCount || 0) + 1;
+    await user.save();
 
     let fileUrl = '';
     let filePublicId = '';

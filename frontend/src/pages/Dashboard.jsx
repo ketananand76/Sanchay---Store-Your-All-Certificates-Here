@@ -13,7 +13,7 @@ import toast from 'react-hot-toast';
 export default function Dashboard() {
   const queryClient = useQueryClient();
   
-  // Tab states: 'folders' | 'approvals' | 'alerts'
+  // Tab states: 'folders' | 'approvals' | 'alerts' | 'payments'
   const [activeTab, setActiveTab] = useState('folders');
   const [folderSearch, setFolderSearch] = useState('');
   const [selectedFolderUser, setSelectedFolderUser] = useState(null);
@@ -42,6 +42,15 @@ export default function Dashboard() {
     queryFn: async () => {
       const res = await api.get('/api/admin/alerts');
       return res.data.alerts;
+    },
+  });
+
+  // Query: pending payments
+  const { data: pendingPayments, isLoading: loadingPayments, error: paymentsError } = useQuery({
+    queryKey: ['pendingPayments'],
+    queryFn: async () => {
+      const res = await api.get('/api/payments/admin/pending');
+      return res.data.payments;
     },
   });
 
@@ -153,6 +162,38 @@ export default function Dashboard() {
     },
   });
 
+  // Mutation: Approve payment
+  const approvePaymentMutation = useMutation({
+    mutationFn: async (id) => {
+      const res = await api.put(`/api/payments/admin/${id}/verify`, { status: 'approved' });
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success('Payment approved and user upgraded!');
+      queryClient.invalidateQueries({ queryKey: ['pendingPayments'] });
+      queryClient.invalidateQueries({ queryKey: ['adminUsersMonitor'] });
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Payment approval failed');
+    },
+  });
+
+  // Mutation: Reject payment
+  const rejectPaymentMutation = useMutation({
+    mutationFn: async (id) => {
+      const res = await api.put(`/api/payments/admin/${id}/verify`, { status: 'rejected' });
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success('Payment rejected');
+      queryClient.invalidateQueries({ queryKey: ['pendingPayments'] });
+      queryClient.invalidateQueries({ queryKey: ['adminUsersMonitor'] });
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Payment rejection failed');
+    },
+  });
+
   const handleDelete = (id, title) => {
     if (window.confirm(`Are you sure you want to permanently delete "${title}"?`)) {
       deleteMutation.mutate(id);
@@ -252,7 +293,7 @@ export default function Dashboard() {
       </div>
 
       {/* Tab Navigation header */}
-      <div className="flex border-b border-purple-950/40 mb-6 max-w-md">
+      <div className="flex border-b border-purple-950/40 mb-6 max-w-xl">
         <button
           onClick={() => { setSelectedFolderUser(null); setActiveTab('folders'); }}
           className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
@@ -285,6 +326,21 @@ export default function Dashboard() {
           {alertsData?.length > 0 && (
             <span className="bg-red-650 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
               {alertsData.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => { setSelectedFolderUser(null); setActiveTab('payments'); }}
+          className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all flex items-center justify-center gap-1.5 ${
+            activeTab === 'payments'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-gray-500 hover:text-gray-300'
+          }`}
+        >
+          <span>💎 Payments</span>
+          {pendingPayments?.length > 0 && (
+            <span className="bg-amber-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+              {pendingPayments.length}
             </span>
           )}
         </button>
@@ -678,6 +734,94 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================== */}
+      {/* 💎 TAB: PREMIUM PAYMENTS REVIEW            */}
+      {/* ========================================== */}
+      {activeTab === 'payments' && (
+        <div className="space-y-6">
+          {loadingPayments ? (
+            <div className="glass-panel rounded-2xl p-16 flex items-center justify-center border-purple-950/40">
+              <Loader2 className="h-8 w-8 animate-spin text-accent" />
+            </div>
+          ) : paymentsError ? (
+            <div className="glass-panel rounded-2xl p-12 text-center text-red-400 border-red-950/50">
+              Failed to load premium payments.
+            </div>
+          ) : !pendingPayments || pendingPayments.length === 0 ? (
+            <div className="glass-panel rounded-2xl p-16 text-center text-gray-500 border-purple-950/20 bg-[#0c0a13]/40">
+              No pending premium payment verifications. All clear!
+            </div>
+          ) : (
+            <div className="glass-panel rounded-2xl overflow-hidden border-purple-950/40 shadow-xl bg-[#0c0a13]/70">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-purple-950/20 border-b border-purple-950/50 text-gray-400 uppercase text-[10px] font-bold tracking-widest">
+                      <th className="px-6 py-4">User</th>
+                      <th className="px-6 py-4">Plan & Amount</th>
+                      <th className="px-6 py-4">UTR Number</th>
+                      <th className="px-6 py-4">Submitted Date</th>
+                      <th className="px-6 py-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-purple-950/30 text-sm text-gray-300">
+                    {pendingPayments.map((payment) => (
+                      <tr key={payment._id} className="hover:bg-[#12111d]/40 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            {payment.user?.profilePicture ? (
+                              <img
+                                src={getFileUrl(payment.user.profilePicture)}
+                                alt=""
+                                className="w-7 h-7 rounded-full object-cover border border-purple-950"
+                              />
+                            ) : (
+                              <div className="w-7 h-7 rounded-full bg-purple-950 flex items-center justify-center font-bold text-xs text-purple-300">
+                                {payment.user?.name?.charAt(0).toUpperCase() || 'U'}
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-bold text-white">{payment.user?.name || 'Unknown'}</div>
+                              <div className="text-xs text-gray-500">{payment.user?.email || 'No Email'}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-amber-500">{payment.planName}</div>
+                          <div className="text-xs text-gray-500">₹{payment.amount}</div>
+                        </td>
+                        <td className="px-6 py-4 font-mono text-white text-xs font-bold">
+                          {payment.utrNumber}
+                        </td>
+                        <td className="px-6 py-4 text-xs text-gray-500">
+                          {new Date(payment.createdAt).toLocaleString('en-IN')}
+                        </td>
+                        <td className="px-6 py-4 text-right space-x-2">
+                          <button
+                            onClick={() => approvePaymentMutation.mutate(payment._id)}
+                            disabled={approvePaymentMutation.isLoading}
+                            className="inline-flex items-center justify-center text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => rejectPaymentMutation.mutate(payment._id)}
+                            disabled={rejectPaymentMutation.isLoading}
+                            className="inline-flex items-center justify-center text-xs font-bold bg-red-650 hover:bg-red-750 text-white px-4 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            Reject
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>

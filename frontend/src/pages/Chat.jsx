@@ -477,15 +477,15 @@ export default function Chat() {
       {/* Ambient glow */}
       <div className="absolute top-0 left-[-5%] w-[30vw] h-[30vw] bg-purple-900/8 rounded-full blur-[100px] pointer-events-none" />
 
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-12 rounded-2xl overflow-hidden shadow-2xl border border-slate-200 bg-white min-h-0">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-12 rounded-3xl overflow-hidden shadow-2xl border border-white/60 bg-white/45 backdrop-blur-2xl min-h-0">
 
         {/* ================================ */}
         {/* SIDEBAR (hidden on mobile when chat is open) */}
         {/* ================================ */}
-        <div className={`md:col-span-4 border-r border-slate-200 flex flex-col h-full bg-white ${showMobileChat ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`md:col-span-4 border-r border-white/40 flex flex-col h-full bg-white/20 backdrop-blur-xl ${showMobileChat ? 'hidden md:flex' : 'flex'}`}>
 
           {/* Sidebar Header */}
-          <div className="px-4 py-4 flex items-center justify-between bg-slate-50 border-b border-slate-200">
+          <div className="px-4 py-4 flex items-center justify-between bg-white/30 border-b border-white/40">
             <div className="flex items-center gap-3">
               {currentUser?.profilePicture ? (
                 <img src={getFileUrl(currentUser.profilePicture)} alt={currentUser.name}
@@ -508,7 +508,7 @@ export default function Chat() {
           </div>
 
           {/* Tab Navigation */}
-          <div className="flex bg-slate-50 border-b border-slate-200">
+          <div className="flex bg-white/30 border-b border-white/40">
             {[
               { key: 'chats', label: 'Chats', badge: totalUnread },
               { key: 'status', label: 'Status' },
@@ -534,7 +534,7 @@ export default function Chat() {
 
           {/* Search Bar (for chats tab) */}
           {activeTab === 'chats' && (
-            <div className="px-3 py-2.5 bg-slate-50 border-b border-slate-200">
+            <div className="px-3 py-2.5 bg-white/30 border-b border-white/40">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                 <input
@@ -570,8 +570,8 @@ export default function Chat() {
                     <button
                       key={contact._id}
                       onClick={() => openDirectChat(contact)}
-                      className={`w-full flex items-center gap-3 px-4 py-3.5 border-b border-slate-100 transition-all text-left hover:bg-slate-50 ${
-                        active ? 'bg-slate-100' : ''
+                      className={`w-full flex items-center gap-3 px-4 py-3.5 border-b border-white/10 transition-all text-left hover:bg-white/30 ${
+                        active ? 'bg-white/40' : ''
                       }`}
                     >
                       {/* Avatar */}
@@ -767,13 +767,12 @@ export default function Chat() {
         {/* ================================ */}
         {/* CHAT PANEL (hidden on mobile when no chat) */}
         {/* ================================ */}
-        <div className={`md:col-span-8 flex flex-col h-full bg-[#efeae2] relative ${!showMobileChat ? 'hidden md:flex' : 'flex'}`}
-          style={{ backgroundImage: "radial-gradient(circle at 20% 80%, rgba(0,0,0,0.01) 0%, transparent 60%)" }}>
+        <div className={`md:col-span-8 flex flex-col h-full bg-white/10 backdrop-blur-xl relative ${!showMobileChat ? 'hidden md:flex' : 'flex'}`}>
 
           {selectedUser ? (
             <>
               {/* Chat Header */}
-              <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50 shadow-sm z-10">
+              <div className="px-4 py-3 border-b border-white/40 flex items-center justify-between bg-white/30 shadow-sm z-10">
                 <div className="flex items-center gap-3">
                   {/* Mobile back button */}
                   <button
@@ -855,7 +854,7 @@ export default function Chat() {
                 ref={chatContainerRef}
                 onScroll={handleScroll}
                 className="flex-1 overflow-y-auto px-4 py-5 space-y-1 relative"
-                style={{ background: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cpath d='M40 40 L60 20 L80 40 L60 60 Z' fill='rgba(0,0,0,0.02)'/%3E%3C/svg%3E\")" }}
+                style={{ background: "transparent" }}
                 onClick={() => setShowReactionPicker(null)}
               >
                 {messages.length === 0 ? (
@@ -901,10 +900,10 @@ export default function Chat() {
                             {/* Bubble */}
                             <div
                               onDoubleClick={() => chatType === 'direct' && handleReaction(msg._id, '❤️')}
-                              className={`relative px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed cursor-pointer select-none shadow-sm ${
+                              className={`relative px-4 py-3 rounded-2xl text-sm leading-relaxed cursor-pointer select-none shadow-md ${
                                 isSelf
-                                  ? 'bg-[#d9fdd3] text-[#111b21] rounded-br-sm border border-[#e1f7de]'
-                                  : 'bg-[#ffffff] text-[#111b21] rounded-bl-sm border border-slate-100'
+                                  ? 'bg-gradient-to-tr from-purple-650 to-indigo-600 text-white rounded-br-sm border border-purple-500/35 shadow-purple-500/10'
+                                  : 'bg-white/70 backdrop-blur-md text-slate-800 rounded-bl-sm border border-white/90 shadow-sm'
                               }`}
                             >
                               {/* Image message */}
@@ -924,14 +923,14 @@ export default function Chat() {
 
                               {/* Time + read receipt */}
                               <div className="flex items-center gap-1 mt-1 justify-end">
-                                <span className="text-[9px] opacity-60 font-mono">{formatTime(msg.createdAt)}</span>
+                                <span className={`text-[9px] font-mono ${isSelf ? 'text-white/75' : 'text-slate-500'}`}>{formatTime(msg.createdAt)}</span>
                                 {isSelf && chatType === 'direct' && (
                                   msg.read ? (
-                                    <CheckCheck className="h-3.5 w-3.5 text-sky-400 opacity-95 shrink-0" />
+                                    <CheckCheck className="h-3.5 w-3.5 text-amber-300 opacity-95 shrink-0" />
                                   ) : msg.delivered ? (
-                                    <CheckCheck className="h-3.5 w-3.5 text-slate-400 opacity-80 shrink-0" />
+                                    <CheckCheck className="h-3.5 w-3.5 text-white/70 opacity-80 shrink-0" />
                                   ) : (
-                                    <Check className="h-3.5 w-3.5 text-slate-400 opacity-80 shrink-0" />
+                                    <Check className="h-3.5 w-3.5 text-white/70 opacity-80 shrink-0" />
                                   )
                                 )}
                               </div>
@@ -985,7 +984,7 @@ export default function Chat() {
               </div>
 
               {/* Input Bar */}
-              <div className="px-3 py-3 border-t border-slate-200 bg-slate-50">
+              <div className="px-3 py-3 border-t border-white/40 bg-white/30 backdrop-blur-md">
                 <input type="file" ref={fileInputRef} onChange={handleImageSend} accept="image/*" className="hidden" />
                 <form onSubmit={handleSendMessage} className="flex items-center gap-2">
                   {/* Attachment */}
@@ -1079,17 +1078,17 @@ export default function Chat() {
             </>
           ) : (
             /* Empty state */
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative z-10">
               <div className="relative mb-8">
-                <div className="w-28 h-28 rounded-full bg-green-900/20 border-2 border-green-700/20 flex items-center justify-center">
-                  <MessageSquare className="h-12 w-12 text-green-700/50" />
+                <div className="w-28 h-28 rounded-full bg-purple-600/10 border-2 border-purple-500/20 flex items-center justify-center">
+                  <MessageSquare className="h-12 w-12 text-purple-600/60" />
                 </div>
-                <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-green-600/20 border border-green-600/30 rounded-full flex items-center justify-center">
-                  <Phone className="h-5 w-5 text-green-500/60" />
+                <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-purple-600/20 border border-purple-600/30 rounded-full flex items-center justify-center">
+                  <Phone className="h-5 w-5 text-purple-500/60" />
                 </div>
               </div>
-              <h3 className="text-2xl font-bold text-white mb-2">Sanchay Chat</h3>
-              <p className="text-sm text-gray-500 max-w-xs leading-relaxed mb-6">
+              <h3 className="text-2xl font-bold text-slate-800 mb-2">Yogyata Chat</h3>
+              <p className="text-sm text-slate-500 max-w-xs leading-relaxed mb-6">
                 Send and receive messages, share certificates, make calls — all end-to-end encrypted.
               </p>
               <div className="grid grid-cols-3 gap-3 text-center">

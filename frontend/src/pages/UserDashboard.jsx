@@ -4,7 +4,7 @@ import api, { getFileUrl, socketUrl } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { Award, Plus, Trash2, ExternalLink, Calendar, FileText, Upload, Loader2, LogOut, ShieldCheck, ShieldAlert, Sparkles, CheckCircle2, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { io } from 'socket.io-client';
 
 const categories = ['Development', 'Cloud', 'Security', 'Data Science', 'Academic', 'Design', 'Other'];
@@ -301,6 +301,8 @@ export default function UserDashboard() {
   }
 
   const certificates = data?.certificates || [];
+  const isPremiumActive = user?.isPremium && user?.premiumExpiresAt && new Date(user.premiumExpiresAt) > new Date();
+  const limitReached = !isPremiumActive && certificates.length >= 3;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-screen relative z-10">
@@ -340,21 +342,32 @@ export default function UserDashboard() {
       {/* Header section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-          <span className="text-[10px] text-indian-gold font-bold tracking-[0.2em] uppercase">User Vault Panel</span>
+          <span className="text-[10px] text-indian-gold font-bold tracking-[0.2em] uppercase">
+            {isPremiumActive ? '💎 User Premium Vault' : 'User Vault Panel'}
+          </span>
           <h1 className="font-accent text-3xl font-bold text-white tracking-wide mt-1">
             Welcome, {user.name}
           </h1>
           <p className="text-xs text-gray-500 mt-1 uppercase tracking-wider">
-            Upload document scans & monitor approval status in real-time
+            {isPremiumActive ? 'Unlimited certificate scanning & portfolio exports active' : 'Upload document scans & monitor approval status (Free Limit: 3)'}
           </p>
         </div>
 
         <div className="flex gap-3">
           {/* File trigger that initiates the Scan */}
-          <label className="inline-flex items-center gap-1.5 bg-gradient-to-r from-accent to-accent-dark hover:from-accent-dark hover:to-accent text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-purple-500/10 hover:scale-[1.01] transition-all cursor-pointer">
-            <Plus className="h-4.5 w-4.5" /> Upload & Scan
-            <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFileChange} className="hidden" />
-          </label>
+          {limitReached ? (
+            <Link
+              to="/premium"
+              className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-500 text-slate-900 text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-amber-500/10 hover:scale-[1.01] transition-all cursor-pointer"
+            >
+              <Sparkles className="h-4.5 w-4.5 text-slate-900 fill-current animate-pulse" /> Upgrade to Premium
+            </Link>
+          ) : (
+            <label className="inline-flex items-center gap-1.5 bg-gradient-to-r from-accent to-accent-dark hover:from-accent-dark hover:to-accent text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-purple-500/10 hover:scale-[1.01] transition-all cursor-pointer">
+              <Plus className="h-4.5 w-4.5" /> Upload & Scan
+              <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFileChange} className="hidden" />
+            </label>
+          )}
           
           <button
             onClick={handleLogout}

@@ -6,7 +6,7 @@ import api, { socketUrl, getFileUrl } from '../utils/api';
 import { io } from 'socket.io-client';
 import { 
   Award, Shield, LogOut, Home, Search, FolderOpen, 
-  MessageSquare, User, Bell, ShieldAlert, Briefcase
+  MessageSquare, User, Bell, ShieldAlert, Briefcase, Sparkles
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -240,6 +240,16 @@ export default function Navbar() {
                     <FolderOpen className="h-4 w-4 text-purple-600" /> Vault
                   </Link>
 
+                  {/* Premium Link */}
+                  <Link
+                    to="/premium"
+                    className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
+                      isActive('/premium') ? 'text-amber-550 font-bold' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Sparkles className={`h-4 w-4 ${user?.isPremium ? 'text-amber-500 fill-current animate-pulse' : 'text-slate-400'}`} /> Premium
+                  </Link>
+
                   {/* Profile Link */}
                   <Link
                     to={`/profile/${user._id}`}
@@ -369,6 +379,17 @@ export default function Navbar() {
           >
             <FolderOpen className="h-5 w-5" />
             <span>Vault</span>
+          </Link>
+
+          {/* 6. Premium Upgrade */}
+          <Link
+            to="/premium"
+            className={`flex flex-col items-center gap-0.5 text-[10px] font-bold ${
+              isActive('/premium') ? 'text-amber-600' : 'text-slate-400'
+            }`}
+          >
+            <Sparkles className={`h-5 w-5 ${user?.isPremium ? 'text-amber-500 fill-current animate-pulse' : ''}`} />
+            <span>Premium</span>
           </Link>
         </div>
       )}

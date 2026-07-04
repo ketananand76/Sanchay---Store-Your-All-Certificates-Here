@@ -94,6 +94,7 @@ export default function UserProfile() {
   }
 
   const { user, certificates } = data;
+  const isPremiumActive = user?.isPremium && user?.premiumExpiresAt && new Date(user.premiumExpiresAt) > new Date();
   const isFollowing = currentUser && user.followers?.some((f) => String(f._id || f) === String(currentUser._id));
   const isPrivate = user.privateAccount && !isSelf && !isFollowing && !isAdmin;
 
@@ -167,6 +168,139 @@ export default function UserProfile() {
     }
   };
 
+  const handleDownloadPDF = () => {
+    if (!isPremiumActive) {
+      toast.error('PDF Portfolio Download is a Premium Feature.');
+      return;
+    }
+
+    const approvedCerts = certificates.filter(c => c.status === 'approved');
+    if (approvedCerts.length === 0) {
+      toast.error('No approved certificates found to compile in the portfolio.');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    const certsHtml = approvedCerts.map(c => `
+      <div class="certificate-card">
+        <h3>${c.title}</h3>
+        <p><strong>Issuer:</strong> ${c.issuer}</p>
+        <p><strong>Date Issued:</strong> ${new Date(c.dateIssued).toLocaleDateString()}</p>
+        <p><strong>Category:</strong> ${c.category}</p>
+        ${c.description ? `<p><strong>Description:</strong> ${c.description}</p>` : ''}
+        ${c.verifyUrl ? `<p><strong>Verification URL:</strong> <a href="${c.verifyUrl}" target="_blank">${c.verifyUrl}</a></p>` : ''}
+      </div>
+    `).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${user.name}'s Certificate Portfolio</title>
+          <style>
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              color: #1e293b;
+              padding: 40px;
+              line-height: 1.6;
+              background: #fff;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 3px solid #7c3aed;
+              padding-bottom: 20px;
+              margin-bottom: 30px;
+            }
+            .header h1 {
+              margin: 0;
+              color: #7c3aed;
+              font-size: 28px;
+              letter-spacing: 1px;
+            }
+            .header p {
+              margin: 5px 0 0 0;
+              color: #64748b;
+              font-size: 14px;
+            }
+            .profile-section {
+              background: #f8fafc;
+              border: 1px solid #e2e8f0;
+              padding: 20px;
+              border-radius: 12px;
+              margin-bottom: 30px;
+            }
+            .profile-section h2 {
+              margin: 0 0 10px 0;
+              font-size: 18px;
+              color: #0f172a;
+            }
+            .profile-section p {
+              margin: 4px 0;
+              font-size: 13px;
+              color: #475569;
+            }
+            .certificate-card {
+              border: 1px solid #e2e8f0;
+              border-left: 5px solid #7c3aed;
+              padding: 20px;
+              border-radius: 8px;
+              margin-bottom: 20px;
+              page-break-inside: avoid;
+            }
+            .certificate-card h3 {
+              margin: 0 0 10px 0;
+              color: #1e293b;
+              font-size: 16px;
+            }
+            .certificate-card p {
+              margin: 4px 0;
+              font-size: 12px;
+              color: #475569;
+            }
+            .certificate-card a {
+              color: #7c3aed;
+              text-decoration: none;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 50px;
+              font-size: 11px;
+              color: #94a3b8;
+              border-top: 1px solid #e2e8f0;
+              padding-top: 15px;
+            }
+            @media print {
+              body { padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>YOGYATA PORTFOLIO</h1>
+            <p>Verified Professional Credential Showcase</p>
+          </div>
+          <div class="profile-section">
+            <h2>${user.name}</h2>
+            <p><strong>Email:</strong> ${user.email}</p>
+            ${user.bio ? `<p><strong>Bio:</strong> ${user.bio}</p>` : ''}
+            <p><strong>Verified Credentials:</strong> ${approvedCerts.length} active certificates</p>
+          </div>
+          <h2>Verified Credentials</h2>
+          ${certsHtml}
+          <div class="footer">
+            Generated via Yogyata Store • Verified digital certificate vault.
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(() => { window.close(); }, 500);
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 min-h-screen relative z-10">
       <div className="absolute top-[10%] left-[-15%] w-[40vw] h-[40vw] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
@@ -182,11 +316,22 @@ export default function UserProfile() {
       {/* ======================================= */}
       {/* PROFILE HEADER */}
       {/* ======================================= */}
-      <div className="glass-panel rounded-3xl p-6 sm:p-8 border-purple-950/40 shadow-2xl space-y-5 bg-[#0c0a13]/70 mb-6">
-        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+      <div className={`glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 bg-[#0c0a13]/70 mb-6 transition-all duration-500 relative overflow-hidden ${
+        isPremiumActive 
+          ? 'border-2 border-amber-500/50 shadow-amber-500/5' 
+          : 'border border-purple-950/40'
+      }`}>
+        {isPremiumActive && (
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-xl pointer-events-none"></div>
+        )}
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 relative z-10">
           {/* Avatar */}
           <div className="relative shrink-0">
-            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-purple-950/30 border-2 border-purple-800/40 overflow-hidden flex items-center justify-center font-accent text-3xl font-bold text-purple-300 shadow-lg">
+            <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden flex items-center justify-center font-accent text-3xl font-bold shadow-lg ${
+              isPremiumActive
+                ? 'bg-gradient-to-tr from-amber-500 via-yellow-400 to-amber-300 border-2 border-amber-400 text-slate-900'
+                : 'bg-purple-950/30 border-2 border-purple-800/40 text-purple-300'
+            }`}>
               {user.profilePicture ? (
                 <img src={getFileUrl(user.profilePicture)} alt={user.name} className="w-full h-full object-cover" />
               ) : (
@@ -207,7 +352,14 @@ export default function UserProfile() {
           {/* Meta */}
           <div className="flex-1 space-y-3 text-center sm:text-left">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-center sm:justify-start">
-              <h2 className="font-accent text-2xl font-bold text-white tracking-wide">{user.name}</h2>
+              <h2 className="font-accent text-2xl font-bold text-white tracking-wide flex items-center gap-1.5 justify-center sm:justify-start">
+                {user.name}
+                {isPremiumActive && (
+                  <span className="text-amber-500 animate-pulse" title="Premium Gold Badge">
+                    <Sparkles className="h-5 w-5 fill-current" />
+                  </span>
+                )}
+              </h2>
               {user.privateAccount && (
                 <span className="inline-flex items-center gap-1 bg-[#120f26]/80 text-[9px] font-bold text-purple-300 uppercase tracking-widest px-2 py-0.5 rounded border border-purple-900/60 w-fit mx-auto sm:mx-0">
                   <Lock className="h-2.5 w-2.5" /> Private
@@ -270,6 +422,14 @@ export default function UserProfile() {
 
             {/* Action buttons */}
             <div className="flex flex-wrap gap-3 pt-1 justify-center sm:justify-start">
+              {isPremiumActive && (
+                <button
+                  onClick={handleDownloadPDF}
+                  className="bg-amber-500/15 border border-amber-500/30 text-amber-400 font-bold px-5 py-2 rounded-xl text-xs flex items-center gap-1.5 hover:bg-amber-500/25 transition-all shadow-md shadow-amber-505/5"
+                >
+                  <Award className="h-3.5 w-3.5 text-amber-500" /> PDF Portfolio
+                </button>
+              )}
               {isSelf ? (
                 <button
                   onClick={() => setActiveProfileTab('settings')}

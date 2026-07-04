@@ -49,7 +49,12 @@
 
 @layer base {
   body {
-    @apply bg-dark-bg text-slate-800 font-sans antialiased selection:bg-accent selection:text-white;
+    background: radial-gradient(circle at 10% 20%, rgba(243, 232, 255, 0.75) 0%, transparent 45%),
+                radial-gradient(circle at 90% 10%, rgba(224, 242, 254, 0.75) 0%, transparent 45%),
+                radial-gradient(circle at 50% 80%, rgba(252, 231, 243, 0.65) 0%, transparent 50%),
+                #f8fafc;
+    background-attachment: fixed;
+    @apply text-slate-800 font-sans antialiased selection:bg-accent selection:text-white;
   }
 }
 
