@@ -98,8 +98,10 @@ export default function UserProfile() {
   const isPremiumActive = user?.isPremium && user?.premiumExpiresAt && new Date(user.premiumExpiresAt) > new Date();
   const isFollowing = currentUser && user.followers?.some((f) => String(f._id || f) === String(currentUser._id));
   const isPrivate = user.privateAccount && !isSelf && !isFollowing && !isAdmin;
-  const isFollowerOfMe = (currentUser && currentUser.followers?.some((f) => String(f._id || f) === String(user._id))) ||
-                         (user.following?.some((f) => String(f._id || f) === String(currentUser?._id)));
+  const isFollowerOfMe = !!currentUser && (
+    (currentUser.followers?.some((f) => f && String(f._id || f) === String(user._id))) ||
+    (user.following?.some((f) => f && String(f._id || f) === String(currentUser._id)))
+  );
 
   const handleFollowClick = () => {
     if (!currentUser) { toast.error('Please login to follow users'); return navigate('/login'); }
