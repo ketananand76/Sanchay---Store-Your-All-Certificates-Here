@@ -8,7 +8,7 @@ import {
   Loader2, ArrowLeft, Settings, Grid, User, Mail, Upload, ShieldAlert,
   Save, Eye, EyeOff, Bell, BellOff, Moon, Sun, Key, Trash2, Shield,
   Check, ChevronRight, AlertTriangle, X, Camera, Link as LinkIcon, Phone,
-  Sparkles, Plus, Play, CheckCircle2, Star
+  Sparkles, Plus, Play, CheckCircle2, Star, Volume2, VolumeX
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -27,6 +27,23 @@ export default function UserProfile() {
   const [storyAudience, setStoryAudience] = useState('public');
   const [storyFile, setStoryFile] = useState(null);
   const [isUploadingStory, setIsUploadingStory] = useState(false);
+
+  // Story Editor Studio States
+  const [editorTextOverlays, setEditorTextOverlays] = useState([]);
+  const [editorStickers, setEditorStickers] = useState([]);
+  const [selectedFilter, setSelectedFilter] = useState('none');
+  const [selectedMusic, setSelectedMusic] = useState('');
+  const [textInput, setTextInput] = useState('');
+  const [textColor, setTextColor] = useState('#ffffff');
+  const [textStyle, setTextStyle] = useState('modern');
+  const [isEditingText, setIsEditingText] = useState(false);
+  const [activeElementId, setActiveElementId] = useState(null);
+  const [storyFileUrl, setStoryFileUrl] = useState(null);
+  const [isMuted, setIsMuted] = useState(false);
+
+  const canvasRef = useRef(null);
+  const editorAudioRef = useRef(null);
+  const viewerAudioRef = useRef(null);
 
   const [highlightCreatorOpen, setHighlightCreatorOpen] = useState(false);
   const [newHighlightTitle, setNewHighlightTitle] = useState('');
@@ -215,6 +232,10 @@ export default function UserProfile() {
     const formData = new FormData();
     formData.append('file', storyFile);
     formData.append('audience', storyAudience);
+    formData.append('filter', selectedFilter);
+    formData.append('music', selectedMusic);
+    formData.append('textOverlays', JSON.stringify(editorTextOverlays));
+    formData.append('stickers', JSON.stringify(editorStickers));
 
     try {
       const res = await api.post('/api/social/stories', formData, {
@@ -222,7 +243,11 @@ export default function UserProfile() {
       });
       if (res.data.success) {
         toast.success('Story uploaded successfully! ✨');
+        if (editorAudioRef.current) {
+          editorAudioRef.current.pause();
+        }
         setStoryFile(null);
+        setStoryFileUrl(null);
         setStoryCreatorOpen(false);
         queryClient.invalidateQueries({ queryKey: ['userProfile', id] });
       }
@@ -231,6 +256,50 @@ export default function UserProfile() {
     } finally {
       setIsUploadingStory(false);
     }
+  };
+
+  // Handle story file selection
+  const handleStoryFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setStoryFile(file);
+      setStoryFileUrl(URL.createObjectURL(file));
+      setEditorTextOverlays([]);
+      setEditorStickers([]);
+      setSelectedFilter('none');
+      setSelectedMusic('');
+    }
+  };
+
+  // Pointer dragging coordinators
+  const handleCanvasPointerMove = (e) => {
+    if (!activeElementId || !canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    
+    if (clientX === undefined || clientY === undefined) return;
+
+    let pctX = ((clientX - rect.left) / rect.width) * 100;
+    let pctY = ((clientY - rect.top) / rect.height) * 100;
+
+    pctX = Math.max(5, Math.min(95, pctX));
+    pctY = Math.max(5, Math.min(95, pctY));
+
+    if (editorTextOverlays.some(item => item.id === activeElementId)) {
+      setEditorTextOverlays(prev => prev.map(item => 
+        item.id === activeElementId ? { ...item, x: pctX, y: pctY } : item
+      ));
+    } else if (editorStickers.some(item => item.id === activeElementId)) {
+      setEditorStickers(prev => prev.map(item => 
+        item.id === activeElementId ? { ...item, x: pctX, y: pctY } : item
+      ));
+    }
+  };
+
+  const handleCanvasPointerUp = () => {
+    setActiveElementId(null);
   };
 
   // Handle Story Delete
@@ -570,6 +639,25 @@ export default function UserProfile() {
     `);
     printWindow.document.close();
   };
+
+  const FILTER_PRESETS = [
+    { name: 'Normal', value: 'none', class: '' },
+    { name: 'Chrome', value: 'chrome', class: 'contrast-125 brightness-110 saturate-110' },
+    { name: 'Vintage', value: 'vintage', class: 'sepia contrast-85 brightness-105 saturate-125' },
+    { name: 'Noir', value: 'noir', class: 'grayscale contrast-125 brightness-95' },
+    { name: 'Glow', value: 'glow', class: 'brightness-110 saturate-150 contrast-105' },
+    { name: 'Lofi', value: 'lofi', class: 'contrast-115 saturate-125 hue-rotate-15' },
+    { name: 'Retro', value: 'retro', class: 'sepia-[0.35] brightness-95 contrast-95 saturate-110' },
+  ];
+
+  const MUSIC_TRACKS = [
+    { name: 'No Music', url: '' },
+    { name: 'Chill Lofi Beats', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
+    { name: 'Synthwave Sunset', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
+    { name: 'Summer Acoustic', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
+    { name: 'Future Bass', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3' },
+    { name: 'Ambient Chill', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3' },
+  ];
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 min-h-screen relative z-10">
@@ -1655,6 +1743,17 @@ export default function UserProfile() {
       {/* ======================================= */}
       {storyViewer.show && storyViewer.stories.length > 0 && (
         <div className="fixed inset-0 z-[150] bg-[#07050b]/95 backdrop-blur-lg flex items-center justify-center p-0 select-none">
+          {/* Active Story Background Audio */}
+          {storyViewer.stories[storyViewer.activeIndex].music && (
+            <audio
+              ref={viewerAudioRef}
+              src={MUSIC_TRACKS.find(t => t.name === storyViewer.stories[storyViewer.activeIndex].music)?.url}
+              autoPlay
+              loop
+              muted={isMuted}
+            />
+          )}
+
           <div className="w-full max-w-lg h-full sm:h-[85vh] sm:max-w-md bg-[#000] sm:rounded-3xl relative flex flex-col justify-between overflow-hidden shadow-2xl border border-purple-950/20">
             {/* Story Top Progress Indicators */}
             <div className="absolute top-3 left-3 right-3 z-30 flex gap-1">
@@ -1684,7 +1783,14 @@ export default function UserProfile() {
                   ) : user.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <span className="text-xs font-bold text-white block leading-tight">{user.name}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-bold text-white block leading-tight">{user.name}</span>
+                    {storyViewer.stories[storyViewer.activeIndex].music && (
+                      <span className="text-[8px] text-indian-gold flex items-center gap-0.5 animate-pulse bg-black/40 px-1.5 py-0.5 rounded-full border border-purple-950/50">
+                        <Volume2 className="h-2 w-2" /> {storyViewer.stories[storyViewer.activeIndex].music}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[8px] text-gray-400 block leading-tight">
                     {new Date(storyViewer.stories[storyViewer.activeIndex].createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
@@ -1697,6 +1803,14 @@ export default function UserProfile() {
               </div>
 
               <div className="flex items-center gap-1.5">
+                {storyViewer.stories[storyViewer.activeIndex].music && (
+                  <button
+                    onClick={() => setIsMuted(!isMuted)}
+                    className="p-1 rounded-lg bg-black/45 text-purple-400 hover:text-white border border-purple-950/30 transition-colors"
+                  >
+                    {isMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                  </button>
+                )}
                 {isSelf && (
                   <button
                     onClick={() => handleStoryDelete(storyViewer.stories[storyViewer.activeIndex]._id)}
@@ -1739,15 +1853,56 @@ export default function UserProfile() {
                   src={getFileUrl(storyViewer.stories[storyViewer.activeIndex].fileUrl)} 
                   autoPlay 
                   playsInline 
-                  className="w-full h-full object-contain"
+                  className={`w-full h-full object-contain ${
+                    FILTER_PRESETS.find(f => f.value === storyViewer.stories[storyViewer.activeIndex].filter)?.class || ''
+                  }`}
                 />
               ) : (
                 <img 
                   src={getFileUrl(storyViewer.stories[storyViewer.activeIndex].fileUrl)} 
                   alt="User Story" 
-                  className="w-full h-full object-contain"
+                  className={`w-full h-full object-contain ${
+                    FILTER_PRESETS.find(f => f.value === storyViewer.stories[storyViewer.activeIndex].filter)?.class || ''
+                  }`}
                 />
               )}
+
+              {/* Render stickers/emojis overlays */}
+              {storyViewer.stories[storyViewer.activeIndex].stickers && 
+                storyViewer.stories[storyViewer.activeIndex].stickers.map((stk, idx) => (
+                  <div
+                    key={idx}
+                    className="absolute select-none pointer-events-none"
+                    style={{
+                      left: `${stk.x}%`,
+                      top: `${stk.y}%`,
+                      transform: `translate(-50%, -50%) scale(${stk.scale || 1.5})`,
+                    }}
+                  >
+                    <span className="text-3xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">{stk.emoji}</span>
+                  </div>
+              ))}
+
+              {/* Render text overlays */}
+              {storyViewer.stories[storyViewer.activeIndex].textOverlays && 
+                storyViewer.stories[storyViewer.activeIndex].textOverlays.map((txt, idx) => (
+                  <div
+                    key={idx}
+                    className="absolute select-none pointer-events-none p-1.5 rounded-lg bg-[#000000]/30 border border-white/5 backdrop-blur-[0.5px]"
+                    style={{
+                      left: `${txt.x}%`,
+                      top: `${txt.y}%`,
+                      color: txt.color,
+                      fontFamily: txt.fontStyle === 'neon' ? 'monospace' : txt.fontStyle === 'serif' ? 'serif' : txt.fontStyle === 'elegant' ? 'cursive' : 'sans-serif',
+                      fontWeight: 'bold',
+                      transform: 'translate(-50%, -50%)',
+                      fontSize: `${txt.fontSize || 16}px`,
+                      textShadow: txt.fontStyle === 'neon' ? '0 0 5px #fff, 0 0 10px #fff, 0 0 15px #a855f7, 0 0 20px #a855f7' : 'none'
+                    }}
+                  >
+                    <span>{txt.text}</span>
+                  </div>
+              ))}
             </div>
           </div>
         </div>
@@ -1757,93 +1912,351 @@ export default function UserProfile() {
       {/* 📹 UPLOAD NEW STORY MODAL                 */}
       {/* ======================================= */}
       {storyCreatorOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#07050b]/80 backdrop-blur-md p-4">
-          <div className="w-full max-w-md bg-[#12111d] glass-panel border border-purple-950/40 rounded-3xl p-6 shadow-2xl space-y-5">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#07050b]/90 backdrop-blur-md p-4 overflow-y-auto">
+          {selectedMusic && (
+            <audio
+              ref={editorAudioRef}
+              src={MUSIC_TRACKS.find(t => t.name === selectedMusic)?.url}
+              autoPlay
+              loop
+              muted={isMuted}
+            />
+          )}
+
+          <div className="w-full max-w-4xl bg-[#12111d] glass-panel border border-purple-950/40 rounded-3xl p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-purple-950/30 pb-3">
               <h3 className="font-accent text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Plus className="h-4.5 w-4.5 text-accent" /> Share New Story
+                <Plus className="h-4.5 w-4.5 text-accent" /> {storyFile ? 'Instagram Story Studio' : 'Share New Story'}
               </h3>
               <button
-                onClick={() => setStoryCreatorOpen(false)}
+                onClick={() => {
+                  if (editorAudioRef.current) editorAudioRef.current.pause();
+                  setStoryFile(null);
+                  setStoryFileUrl(null);
+                  setStoryCreatorOpen(false);
+                }}
                 className="p-1.5 text-gray-400 hover:text-white transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleStoryUpload} className="space-y-4">
-              {/* File Input */}
-              <div className="space-y-2">
-                <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Select Media (Image/Video)</label>
-                <div className="relative border-2 border-dashed border-purple-950/50 hover:border-purple-800/60 rounded-2xl p-6 text-center transition-all bg-[#07050d]">
+            {!storyFile ? (
+              <div className="space-y-4 py-4">
+                <div className="relative border-2 border-dashed border-purple-950/50 hover:border-purple-800/60 rounded-2xl p-10 text-center transition-all bg-[#07050d]">
                   <input
                     type="file"
                     accept="image/*,video/*"
                     required
-                    onChange={(e) => setStoryFile(e.target.files[0])}
+                    onChange={handleStoryFileChange}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   />
-                  <Upload className="h-8 w-8 text-purple-400 mx-auto mb-2" />
-                  <p className="text-xs text-gray-300 font-semibold">
-                    {storyFile ? storyFile.name : 'Click or Drag file to upload'}
-                  </p>
-                  <p className="text-[9px] text-gray-500 mt-1">Supports images and videos up to 10MB</p>
+                  <Upload className="h-10 w-10 text-purple-400 mx-auto mb-3 animate-bounce" />
+                  <p className="text-sm text-gray-300 font-semibold">Choose an image or video to customize</p>
+                  <p className="text-xs text-gray-500 mt-1">Supports PNG, JPG, JPEG, and MP4 up to 10MB</p>
                 </div>
               </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                {/* Left Column: Draggable Preview Canvas */}
+                <div className="md:col-span-6 flex justify-center">
+                  <div 
+                    ref={canvasRef}
+                    onPointerMove={handleCanvasPointerMove}
+                    onPointerUp={handleCanvasPointerUp}
+                    className="relative w-full max-w-[280px] aspect-[9/16] bg-black rounded-2xl overflow-hidden border border-purple-900/40 shadow-2xl select-none"
+                  >
+                    {/* Media content */}
+                    {storyFile.type.startsWith('video') ? (
+                      <video
+                        src={storyFileUrl}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className={`w-full h-full object-cover select-none pointer-events-none ${
+                          FILTER_PRESETS.find(f => f.value === selectedFilter)?.class || ''
+                        }`}
+                      />
+                    ) : (
+                      <img
+                        src={storyFileUrl}
+                        alt="Story Editor"
+                        className={`w-full h-full object-cover select-none pointer-events-none ${
+                          FILTER_PRESETS.find(f => f.value === selectedFilter)?.class || ''
+                        }`}
+                      />
+                    )}
 
-              {/* Story Audience Selection */}
-              <div className="space-y-2">
-                <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Select Audience</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setStoryAudience('public')}
-                    className={`py-2.5 rounded-xl text-xs font-bold transition-all border ${
-                      storyAudience === 'public'
-                        ? 'bg-accent text-white border-accent shadow-md shadow-purple-500/10'
-                        : 'bg-purple-950/20 border-purple-950/50 text-gray-400 hover:text-gray-300'
-                    }`}
-                  >
-                    Public
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStoryAudience('close-friends')}
-                    className={`py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 ${
-                      storyAudience === 'close-friends'
-                        ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-500/10'
-                        : 'bg-purple-950/20 border-purple-950/50 text-gray-400 hover:text-emerald-400/80'
-                    }`}
-                  >
-                    <Star className="h-3.5 w-3.5 fill-current" /> Close Friends
-                  </button>
+                    {/* Draggable Emojis/Stickers */}
+                    {editorStickers.map((stk) => (
+                      <div
+                        key={stk.id}
+                        onPointerDown={(e) => { e.stopPropagation(); setActiveElementId(stk.id); }}
+                        className="absolute cursor-move select-none p-1.5 rounded-lg active:scale-105 active:border active:border-accent bg-transparent flex items-center justify-center group"
+                        style={{
+                          left: `${stk.x}%`,
+                          top: `${stk.y}%`,
+                          transform: `translate(-50%, -50%) scale(${stk.scale})`,
+                          touchAction: 'none'
+                        }}
+                      >
+                        <span className="text-3xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">{stk.emoji}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditorStickers(editorStickers.filter(s => s.id !== stk.id));
+                          }}
+                          className="absolute -top-2 -right-2 w-4 h-4 bg-red-650 rounded-full flex items-center justify-center border border-black hover:bg-red-750 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="h-2.5 w-2.5 text-white" />
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* Draggable Text Overlays */}
+                    {editorTextOverlays.map((txt) => (
+                      <div
+                        key={txt.id}
+                        onPointerDown={(e) => { e.stopPropagation(); setActiveElementId(txt.id); }}
+                        className="absolute cursor-move select-none p-2 rounded-lg active:scale-105 active:border active:border-accent bg-[#000000]/35 border border-white/5 backdrop-blur-[1px] flex items-center justify-center group"
+                        style={{
+                          left: `${txt.x}%`,
+                          top: `${txt.y}%`,
+                          color: txt.color,
+                          fontFamily: txt.fontStyle === 'neon' ? 'monospace' : txt.fontStyle === 'serif' ? 'serif' : txt.fontStyle === 'elegant' ? 'cursive' : 'sans-serif',
+                          fontWeight: 'bold',
+                          transform: 'translate(-50%, -50%)',
+                          fontSize: `${txt.fontSize}px`,
+                          textShadow: txt.fontStyle === 'neon' ? '0 0 5px #fff, 0 0 10px #fff, 0 0 15px #a855f7, 0 0 20px #a855f7' : 'none',
+                          touchAction: 'none'
+                        }}
+                      >
+                        <span>{txt.text}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditorTextOverlays(editorTextOverlays.filter(t => t.id !== txt.id));
+                          }}
+                          className="absolute -top-2 -right-2 w-4 h-4 bg-red-650 rounded-full flex items-center justify-center border border-black hover:bg-red-750 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="h-2.5 w-2.5 text-white" />
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* Audio status banner */}
+                    {selectedMusic && (
+                      <div className="absolute top-12 left-3 bg-[#0c0a13]/85 border border-purple-900/50 backdrop-blur-md px-2.5 py-1 rounded-full text-[8px] font-bold text-indian-gold flex items-center gap-1">
+                        <Volume2 className="h-3 w-3 animate-bounce" /> {selectedMusic}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Column: Customization Sidebar Controls */}
+                <div className="md:col-span-6 space-y-4">
+                  {/* Custom Text Overlay Input */}
+                  <div className="glass-panel p-4 rounded-2xl border-purple-950/20 bg-[#07050d] space-y-2.5">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-purple-300">Add Text Overlay</h4>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Type something..."
+                        value={textInput}
+                        onChange={(e) => setTextInput(e.target.value)}
+                        className="flex-1 bg-[#12111d] border border-purple-950/60 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!textInput.trim()) return;
+                          const newText = {
+                            id: Date.now(),
+                            text: textInput.trim(),
+                            x: 50,
+                            y: 40 + editorTextOverlays.length * 8,
+                            color: textColor,
+                            fontSize: 16,
+                            fontStyle: textStyle
+                          };
+                          setEditorTextOverlays([...editorTextOverlays, newText]);
+                          setTextInput('');
+                        }}
+                        className="bg-accent hover:bg-accent-dark text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+                      >
+                        Add
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      {/* Font Color Circles */}
+                      <div className="flex gap-2">
+                        {['#ffffff', '#000000', '#f59e0b', '#ef4444', '#10b981', '#3b82f6', '#ec4899'].map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setTextColor(c)}
+                            className="w-4 h-4 rounded-full border border-gray-600 transition-all active:scale-95"
+                            style={{
+                              backgroundColor: c,
+                              boxShadow: textColor === c ? '0 0 8px rgba(168, 85, 247, 0.6)' : 'none',
+                              border: textColor === c ? '2px solid white' : '1px solid #4b5563'
+                            }}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Font Style Selection */}
+                      <select
+                        value={textStyle}
+                        onChange={(e) => setTextStyle(e.target.value)}
+                        className="bg-[#12111d] border border-purple-950/60 rounded-lg px-2 py-1 text-[10px] text-purple-300 font-bold"
+                      >
+                        <option value="modern">Modern Sans</option>
+                        <option value="neon">Neon Mono</option>
+                        <option value="elegant">Elegant Style</option>
+                        <option value="serif">Serif Bold</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Stickers / Emojis Grid */}
+                  <div className="glass-panel p-4 rounded-2xl border-purple-950/20 bg-[#07050d] space-y-2">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-purple-300">Add Emojis / Stickers</h4>
+                    <div className="grid grid-cols-6 gap-2">
+                      {['😀', '😂', '😍', '🔥', '✨', '🎉', '💯', '👏', '🙌', '👍', '❤️', '🌟', '🚀', '💻', '🎓', '💼', '🎖️', '👑'].map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => {
+                            const newSticker = {
+                              id: Date.now(),
+                              emoji,
+                              x: 50,
+                              y: 50,
+                              scale: 1.5
+                            };
+                            setEditorStickers([...editorStickers, newSticker]);
+                          }}
+                          className="text-xl p-1.5 rounded-lg hover:bg-purple-950/40 border border-transparent hover:border-purple-900/30 transition-all flex items-center justify-center active:scale-90"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Filters Selector */}
+                  <div className="glass-panel p-4 rounded-2xl border-purple-950/20 bg-[#07050d] space-y-2.5">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-purple-300">Visual Effects / Filters</h4>
+                    <div className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-hide">
+                      {FILTER_PRESETS.map((preset) => (
+                        <button
+                          key={preset.value}
+                          type="button"
+                          onClick={() => setSelectedFilter(preset.value)}
+                          className={`px-3 py-1.5 rounded-full text-[10px] font-semibold tracking-wider shrink-0 transition-all border ${
+                            selectedFilter === preset.value
+                              ? 'bg-accent/25 border-accent text-accent'
+                              : 'bg-purple-950/15 border-purple-950/40 text-gray-400 hover:text-gray-250'
+                          }`}
+                        >
+                          {preset.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Music Track Selector */}
+                  <div className="glass-panel p-4 rounded-2xl border-purple-950/20 bg-[#07050d] space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[10px] font-bold uppercase tracking-wider text-purple-300">Background Music Sound</h4>
+                      {selectedMusic && (
+                        <button
+                          type="button"
+                          onClick={() => setIsMuted(!isMuted)}
+                          className="text-purple-400 hover:text-white transition-colors"
+                        >
+                          {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                        </button>
+                      )}
+                    </div>
+                    <select
+                      value={selectedMusic}
+                      onChange={(e) => setSelectedMusic(e.target.value)}
+                      className="w-full bg-[#12111d] border border-purple-950/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                    >
+                      {MUSIC_TRACKS.map((track) => (
+                        <option key={track.name} value={track.name}>
+                          {track.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Story Audience Selection */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Select Audience</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setStoryAudience('public')}
+                        className={`py-2.5 rounded-xl text-xs font-bold transition-all border ${
+                          storyAudience === 'public'
+                            ? 'bg-accent text-white border-accent shadow-md shadow-purple-500/10'
+                            : 'bg-purple-950/20 border-purple-950/50 text-gray-400 hover:text-gray-300'
+                        }`}
+                      >
+                        Public
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStoryAudience('close-friends')}
+                        className={`py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 ${
+                          storyAudience === 'close-friends'
+                            ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-500/10'
+                            : 'bg-purple-950/20 border-purple-950/50 text-gray-400 hover:text-emerald-400/80'
+                        }`}
+                      >
+                        <Star className="h-3.5 w-3.5 fill-current" /> Close Friends
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Submit / Cancel Buttons */}
+                  <div className="pt-4 border-t border-purple-950/25 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (editorAudioRef.current) editorAudioRef.current.pause();
+                        setStoryFile(null);
+                        setStoryFileUrl(null);
+                      }}
+                      className="flex-1 bg-purple-950/30 border border-purple-900/40 text-purple-300 py-2.5 rounded-xl text-xs font-bold transition-all"
+                    >
+                      Back to Media Select
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleStoryUpload}
+                      disabled={isUploadingStory}
+                      className="flex-1 bg-gradient-to-r from-accent to-accent-dark text-white py-2.5 rounded-xl text-xs font-bold hover:scale-[1.01] transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      {isUploadingStory ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sharing Story...
+                        </>
+                      ) : (
+                        'Share Story Now'
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
-
-              {/* Submit Buttons */}
-              <div className="pt-2 border-t border-purple-950/25 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setStoryCreatorOpen(false)}
-                  className="flex-1 bg-purple-950/30 border border-purple-900/40 text-purple-300 py-2.5 rounded-xl text-xs font-bold transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isUploadingStory}
-                  className="flex-1 bg-gradient-to-r from-accent to-accent-dark text-white py-2.5 rounded-xl text-xs font-bold hover:scale-[1.01] transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
-                >
-                  {isUploadingStory ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sharing...
-                    </>
-                  ) : (
-                    'Share Story'
-                  )}
-                </button>
-              </div>
-            </form>
+            )}
           </div>
         </div>
       )}

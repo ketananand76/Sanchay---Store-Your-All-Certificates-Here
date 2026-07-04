@@ -137,6 +137,26 @@ const userSchema = new mongoose.Schema(
         fileUrl: { type: String, required: true },
         fileType: { type: String, enum: ['image', 'video'], default: 'image' },
         audience: { type: String, enum: ['public', 'close-friends'], default: 'public' },
+        filter: { type: String, default: 'none' },
+        music: { type: String, default: '' },
+        textOverlays: [
+          {
+            text: { type: String, default: '' },
+            x: { type: Number, default: 50 },
+            y: { type: Number, default: 50 },
+            color: { type: String, default: '#ffffff' },
+            fontSize: { type: Number, default: 16 },
+            fontStyle: { type: String, default: 'modern' }
+          }
+        ],
+        stickers: [
+          {
+            emoji: { type: String, default: '' },
+            x: { type: Number, default: 50 },
+            y: { type: Number, default: 50 },
+            scale: { type: Number, default: 1 }
+          }
+        ],
         createdAt: { type: Date, default: Date.now },
         expiresAt: { type: Date, required: true }
       }

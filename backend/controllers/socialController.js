@@ -495,10 +495,23 @@ const uploadUserStory = async (req, res, next) => {
     const audience = req.body.audience || 'public';
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
+    let parsedTextOverlays = [];
+    let parsedStickers = [];
+    try {
+      if (req.body.textOverlays) parsedTextOverlays = JSON.parse(req.body.textOverlays);
+    } catch(e) {}
+    try {
+      if (req.body.stickers) parsedStickers = JSON.parse(req.body.stickers);
+    } catch(e) {}
+
     const newStory = {
       fileUrl,
       fileType: req.file.mimetype.includes('video') ? 'video' : 'image',
       audience,
+      filter: req.body.filter || 'none',
+      music: req.body.music || '',
+      textOverlays: parsedTextOverlays,
+      stickers: parsedStickers,
       createdAt: new Date(),
       expiresAt,
     };
