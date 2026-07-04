@@ -35,7 +35,7 @@ export default function Register() {
       });
 
       if (data.success) {
-        toast.success(data.message || 'Registration successful! Please check your email to verify your account.', { duration: 8000 });
+        toast.success(data.message || 'Registration successful! You can now log in to your account.', { duration: 5000 });
         navigate('/login');
       }
     } catch (error) {

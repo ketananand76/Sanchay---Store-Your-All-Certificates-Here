@@ -48,42 +48,21 @@ const registerUser = async (req, res, next) => {
     const salt = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    const crypto = require('crypto');
-    const token = crypto.randomBytes(32).toString('hex');
-    const tokenExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
-
     const user = await User.create({
       name,
       email,
       passwordHash,
-      isVerified: false,
-      verificationToken: token,
-      verificationTokenExpires: tokenExpires,
+      isVerified: true,
     });
-
-    // Send verification email to user
-    try {
-      const sendEmail = require('../utils/sendEmail');
-      const backendUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
-      const verificationLink = `${backendUrl}/api/users/verify/${token}`;
-      await sendEmail({
-        to: email,
-        subject: 'Verify Your Email - Sanchay',
-        text: `Namaste ${name},\n\nPlease verify your email by clicking the link below:\n\n${verificationLink}\n\nThis link is valid for 24 hours.`,
-        html: `<p>Namaste <strong>${name}</strong>,</p><p>Please verify your email by clicking the link below:</p><p><a href="${verificationLink}">${verificationLink}</a></p><p>This link is valid for 24 hours.</p>`
-      });
-    } catch (err) {
-      console.error('Failed to send verification email to user:', err);
-    }
 
     // Send notification email to admin
     try {
       const sendEmail = require('../utils/sendEmail');
       await sendEmail({
         to: 'ketanpaswan53@gmail.com',
-        subject: 'New User Registered (Verification Pending)',
-        text: `A new user has registered on Yogyata.\n\nName: ${user.name}\nEmail: ${user.email}\nStatus: Verification Link Sent`,
-        html: `<p>A new user has registered on Yogyata.</p><p><strong>Name:</strong> ${user.name}<br><strong>Email:</strong> ${user.email}<br><strong>Status:</strong> Verification Link Sent</p>`
+        subject: 'New User Registered',
+        text: `A new user has registered on Yogyata.\n\nName: ${user.name}\nEmail: ${user.email}\nStatus: Active`,
+        html: `<p>A new user has registered on Yogyata.</p><p><strong>Name:</strong> ${user.name}<br><strong>Email:</strong> ${user.email}<br><strong>Status:</strong> Active</p>`
       });
     } catch (err) {
       console.error('Failed to send registration notification to admin:', err);
@@ -91,7 +70,7 @@ const registerUser = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful! A verification link has been sent to your email. Please verify your account before logging in.',
+      message: 'Registration successful! You can now log in to your account.',
     });
   } catch (error) {
     next(error);
@@ -118,11 +97,6 @@ const loginUser = async (req, res, next) => {
     if (!isMatch) {
       res.status(401);
       throw new Error('Invalid email or password');
-    }
-
-    if (user.isVerified === false) {
-      res.status(400);
-      throw new Error('Please verify your email address. A verification link was sent to your email.');
     }
 
     if (user.status === 'blocked') {
