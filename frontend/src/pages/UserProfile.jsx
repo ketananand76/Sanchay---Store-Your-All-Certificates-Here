@@ -71,6 +71,7 @@ export default function UserProfile() {
       toast.success(resData.message);
       queryClient.invalidateQueries({ queryKey: ['userProfile', id] });
       queryClient.invalidateQueries({ queryKey: ['chatContacts'] });
+      checkAuth();
     },
     onError: (err) => toast.error(err.response?.data?.message || 'Action failed'),
   });
@@ -97,6 +98,8 @@ export default function UserProfile() {
   const isPremiumActive = user?.isPremium && user?.premiumExpiresAt && new Date(user.premiumExpiresAt) > new Date();
   const isFollowing = currentUser && user.followers?.some((f) => String(f._id || f) === String(currentUser._id));
   const isPrivate = user.privateAccount && !isSelf && !isFollowing && !isAdmin;
+  const isFollowerOfMe = (currentUser && currentUser.followers?.some((f) => String(f._id || f) === String(user._id))) ||
+                         (user.following?.some((f) => String(f._id || f) === String(currentUser?._id)));
 
   const handleFollowClick = () => {
     if (!currentUser) { toast.error('Please login to follow users'); return navigate('/login'); }
@@ -452,7 +455,7 @@ export default function UserProfile() {
                         : 'bg-gradient-to-r from-accent to-accent-dark text-white shadow-md shadow-purple-500/10'
                     }`}
                   >
-                    {isFollowing ? 'Following' : 'Follow'}
+                    {isFollowing ? 'Following' : isFollowerOfMe ? 'Follow Back' : 'Follow'}
                   </button>
                   <button
                     onClick={handleMessageClick}

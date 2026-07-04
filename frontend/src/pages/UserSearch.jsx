@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 
 export default function UserSearch() {
   const [query, setQuery] = useState('');
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, checkAuth } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -34,6 +34,7 @@ export default function UserSearch() {
       queryClient.invalidateQueries({ queryKey: ['searchUsers'] });
       queryClient.invalidateQueries({ queryKey: ['userProfile', id] });
       queryClient.invalidateQueries({ queryKey: ['chatContacts'] });
+      checkAuth();
     },
     onError: (err) => {
       toast.error(err.response?.data?.message || 'Action failed');
@@ -96,7 +97,8 @@ export default function UserSearch() {
       ) : (
         <div className="space-y-4">
           {users.map((u) => {
-            const isFollowing = currentUser && u.followers?.includes(currentUser._id);
+            const isFollowing = currentUser && u.followers?.some(f => String(f._id || f) === String(currentUser._id));
+            const isFollowerOfMe = currentUser && (currentUser.followers?.some((f) => String(f._id || f) === String(u._id)) || u.following?.some((f) => String(f._id || f) === String(currentUser._id)));
             return (
               <Link
                 key={u._id}
@@ -138,6 +140,11 @@ export default function UserSearch() {
                       <>
                         <UserCheck className="h-4 w-4" />
                         <span className="hidden sm:inline">Following</span>
+                      </>
+                    ) : isFollowerOfMe ? (
+                      <>
+                        <UserPlus className="h-4 w-4" />
+                        <span className="hidden sm:inline">Follow Back</span>
                       </>
                     ) : (
                       <>

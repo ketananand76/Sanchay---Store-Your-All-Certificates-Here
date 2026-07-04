@@ -25,6 +25,41 @@ export default function CallModal({ socket, callInfo, onClose }) {
   const [isVideoMuted, setIsVideoMuted] = useState(false);
   const [isAudioMuted, setIsAudioMuted] = useState(false);
 
+  // Play loud repeating ringtone during inbound ringing state
+  useEffect(() => {
+    if (callState !== 'ringing') return;
+
+    const playRingtone = () => {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const playTone = (freq, duration, typeOsc = 'triangle', delay = 0, gainVal = 0.5) => {
+          const osc = audioCtx.createOscillator();
+          const gainNode = audioCtx.createGain();
+          osc.connect(gainNode);
+          gainNode.connect(audioCtx.destination);
+          osc.type = typeOsc;
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime + delay);
+          gainNode.gain.setValueAtTime(0.01, audioCtx.currentTime + delay);
+          gainNode.gain.linearRampToValueAtTime(gainVal, audioCtx.currentTime + delay + 0.02);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + delay + duration);
+          osc.start(audioCtx.currentTime + delay);
+          osc.stop(audioCtx.currentTime + delay + duration);
+        };
+        // Loud, distinct electronic alert chime
+        playTone(523.25, 0.3, 'sawtooth', 0, 0.6); // C5
+        playTone(659.25, 0.3, 'sawtooth', 0.15, 0.6); // E5
+        playTone(783.99, 0.45, 'sawtooth', 0.3, 0.6); // G5
+      } catch (err) {
+        console.warn('Ringtone autoplay blocked:', err);
+      }
+    };
+
+    playRingtone(); // Play immediately
+    const ringInterval = setInterval(playRingtone, 2200);
+
+    return () => clearInterval(ringInterval);
+  }, [callState]);
+
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const pcRef = useRef(null);

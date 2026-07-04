@@ -51,28 +51,35 @@ export default function Navbar() {
   const triggerAudioChime = (type = 'notification') => {
     try {
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
+      
+      const playTone = (freq, duration, typeOsc = 'triangle', delay = 0, gainVal = 0.5) => {
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        osc.type = typeOsc;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + delay);
+        
+        // Envelope: quick attack, slow decay
+        gainNode.gain.setValueAtTime(0.01, audioCtx.currentTime + delay);
+        gainNode.gain.linearRampToValueAtTime(gainVal, audioCtx.currentTime + delay + 0.02);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + delay + duration);
+        
+        osc.start(audioCtx.currentTime + delay);
+        osc.stop(audioCtx.currentTime + delay + duration);
+      };
 
       if (type === 'chat') {
-        // High soft chime for DMs
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(680, audioCtx.currentTime);
-        oscillator.frequency.exponentialRampToValueAtTime(1020, audioCtx.currentTime + 0.12);
-        gainNode.gain.setValueAtTime(0.06, audioCtx.currentTime);
-        oscillator.start();
-        oscillator.stop(audioCtx.currentTime + 0.2);
+        // Loud, distinct messaging sound: high triple-beep
+        playTone(980, 0.12, 'sine', 0, 0.65);
+        playTone(1170, 0.12, 'sine', 0.08, 0.65);
+        playTone(1390, 0.16, 'sine', 0.16, 0.65);
       } else {
-        // Double chime alert for notifications
-        oscillator.type = 'triangle';
-        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
-        oscillator.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.1);
-        gainNode.gain.setValueAtTime(0.06, audioCtx.currentTime);
-        oscillator.start();
-        oscillator.stop(audioCtx.currentTime + 0.22);
+        // Loud, distinct alert notification sound: Sci-Fi double chime
+        playTone(880, 0.15, 'sawtooth', 0, 0.55);
+        playTone(1760, 0.25, 'sawtooth', 0.12, 0.55);
       }
     } catch (err) {
       console.warn('Audio autoplay blocked by browser settings:', err);

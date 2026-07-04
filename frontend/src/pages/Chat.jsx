@@ -44,6 +44,36 @@ export default function Chat() {
 
   // Tab: 'chats' | 'status' | 'groups' | 'calls'
   const [activeTab, setActiveTab] = useState('chats');
+
+  // Loud, distinct alert notification sound synthesizer
+  const triggerAudioChime = (type = 'notification') => {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const playTone = (freq, duration, typeOsc = 'triangle', delay = 0, gainVal = 0.5) => {
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        osc.type = typeOsc;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + delay);
+        gainNode.gain.setValueAtTime(0.01, audioCtx.currentTime + delay);
+        gainNode.gain.linearRampToValueAtTime(gainVal, audioCtx.currentTime + delay + 0.02);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + delay + duration);
+        osc.start(audioCtx.currentTime + delay);
+        osc.stop(audioCtx.currentTime + delay + duration);
+      };
+      if (type === 'chat') {
+        playTone(980, 0.12, 'sine', 0, 0.65);
+        playTone(1170, 0.12, 'sine', 0.08, 0.65);
+        playTone(1390, 0.16, 'sine', 0.16, 0.65);
+      } else {
+        playTone(880, 0.15, 'sawtooth', 0, 0.55);
+        playTone(1760, 0.25, 'sawtooth', 0.12, 0.55);
+      }
+    } catch (err) {
+      console.warn('Audio blocked:', err);
+    }
+  };
   const [socket, setSocket] = useState(null);
   const [onlineUsers, setOnlineUsers] = useState([]);
 
@@ -199,6 +229,7 @@ export default function Chat() {
       } else if (senderId !== String(currentUser._id)) {
         setUnreadCounts((prev) => ({ ...prev, [senderId]: (prev[senderId] || 0) + 1 }));
         const senderContact = contactsData?.find((c) => String(c._id) === senderId);
+        triggerAudioChime('chat');
         toast(`💬 New message from ${senderContact?.name || 'someone'}`, { duration: 3000 });
       } else {
         if (activeChatType === 'direct' && activePartner &&

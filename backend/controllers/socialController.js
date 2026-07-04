@@ -3,7 +3,6 @@ const Certificate = require('../models/Certificate');
 const bcrypt = require('bcryptjs');
 const { uploadToCloudinary } = require('../config/cloudinary');
 
-// POST /api/social/follow/:id
 const toggleFollow = async (req, res, next) => {
   try {
     const targetUserId = req.params.id;
@@ -22,16 +21,17 @@ const toggleFollow = async (req, res, next) => {
       throw new Error('User not found');
     }
 
-    const isFollowing = currentUser.following.includes(targetUserId);
+    // Safety: check using string-based match to avoid Mongoose gotchas
+    const isFollowing = currentUser.following.some(id => String(id) === String(targetUserId));
 
     if (isFollowing) {
-      // Unfollow
-      currentUser.following = currentUser.following.filter(id => String(id) !== String(targetUserId));
-      targetUser.followers = targetUser.followers.filter(id => String(id) !== String(currentUserId));
+      // Unfollow (Atomic pulls to prevent duplicate array mismatching)
+      await User.findByIdAndUpdate(currentUserId, { $pull: { following: targetUserId } });
+      await User.findByIdAndUpdate(targetUserId, { $pull: { followers: currentUserId } });
     } else {
-      // Follow
-      currentUser.following.push(targetUserId);
-      targetUser.followers.push(currentUserId);
+      // Follow (Atomic addToSet to guarantee single entry uniqueness)
+      await User.findByIdAndUpdate(currentUserId, { $addToSet: { following: targetUserId } });
+      await User.findByIdAndUpdate(targetUserId, { $addToSet: { followers: currentUserId } });
 
       // Trigger follow notification
       const { createNotification } = require('./notificationController');
@@ -43,9 +43,6 @@ const toggleFollow = async (req, res, next) => {
         relatedId: currentUserId,
       });
     }
-
-    await currentUser.save();
-    await targetUser.save();
 
     res.status(200).json({
       success: true,
