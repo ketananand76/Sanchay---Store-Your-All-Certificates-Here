@@ -130,35 +130,35 @@ export default function Navbar() {
       {/* ========================================== */}
       {/* 💻 TOP NAVBAR: DESKTOP LAYOUT              */}
       {/* ========================================== */}
-      <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
-        <div className="h-[3px] w-full bg-gradient-to-r from-indian-saffron via-slate-200 to-indian-emerald"></div>
-
+      <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-purple-950/10 shadow-sm hover:shadow-purple-500/5 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             
             {/* Left: Brand Logo */}
             <div className="flex items-center">
-              <Link to="/" className="flex items-center gap-2 group">
-                <div className="bg-gradient-to-tr from-accent to-indian-saffron p-1.5 rounded-lg shadow-lg shadow-purple-500/10 group-hover:scale-105 transition-transform">
-                  <Award className="h-6 w-6 text-white" />
+              <Link to="/" className="flex items-center gap-2.5 group">
+                <div className="bg-gradient-to-tr from-accent via-indigo-500 to-cyan-400 p-1.5 rounded-xl shadow-lg shadow-purple-500/15 group-hover:rotate-12 group-hover:scale-105 transition-all duration-300">
+                  <Award className="h-5.5 w-5.5 text-white" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="font-accent text-lg font-bold tracking-wider text-slate-800">
-                    YOGYATA
+                  <span className="font-accent text-md font-extrabold tracking-wider text-slate-900 flex items-center gap-1 group-hover:text-accent transition-colors">
+                    YOGYATA <span className="text-[10px] text-slate-400 font-normal tracking-normal font-sans">योग्यता</span>
                   </span>
-                  <span className="text-[9px] text-purple-600/80 uppercase font-semibold tracking-[0.2em] -mt-1">
-                    योग्यता • Showcase
+                  <span className="text-[8px] text-purple-600/80 uppercase font-bold tracking-[0.25em] -mt-0.5">
+                    Showcase Portal
                   </span>
                 </div>
               </Link>
             </div>
 
             {/* Desktop Navigation Links */}
-            <div className="hidden md:flex items-center gap-6">
+            <div className="hidden md:flex items-center gap-5">
               <Link
                 to="/"
-                className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                  isActive('/') ? 'text-accent' : 'text-slate-600 hover:text-slate-900'
+                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all ${
+                  isActive('/') 
+                    ? 'bg-purple-600/5 text-accent text-glow-purple' 
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
                 <Home className="h-4 w-4" /> Home
@@ -169,15 +169,17 @@ export default function Navbar() {
                 <>
                   <Link
                     to="/admin/dashboard"
-                    className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                      isActive('/admin/dashboard') ? 'text-accent' : 'text-slate-600 hover:text-slate-900'
+                    className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all ${
+                      isActive('/admin/dashboard') 
+                        ? 'bg-purple-600/5 text-accent' 
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                   >
                     <Shield className="h-4 w-4 text-indian-gold" /> Admin Panel
                   </Link>
                   <button
                     onClick={handleLogout}
-                    className="flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-750 transition-colors border border-red-200 hover:border-red-300 px-3.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100"
+                    className="flex items-center gap-1.5 text-xs font-semibold text-red-650 hover:text-red-700 transition-all border border-red-200/50 hover:border-red-300 px-3.5 py-1.5 rounded-xl bg-red-500/5"
                   >
                     <LogOut className="h-4 w-4" /> Logout
                   </button>
@@ -187,89 +189,96 @@ export default function Navbar() {
               {/* Logged-in Seeker Navigation */}
               {user && (
                 <>
-                  {/* Search Link */}
                   <Link
                     to="/search"
-                    className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                      isActive('/search') ? 'text-accent' : 'text-slate-600 hover:text-slate-900'
+                    className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all ${
+                      isActive('/search') 
+                        ? 'bg-purple-600/5 text-accent' 
+                        : 'text-slate-605 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                   >
-                    <Search className="h-4 w-4 text-purple-600" /> Search
+                    <Search className="h-4 w-4 text-purple-500" /> Search
                   </Link>
 
-                  {/* Jobs Link */}
                   <Link
                     to="/jobs"
-                    className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                      isActive('/jobs') ? 'text-accent' : 'text-slate-600 hover:text-slate-900'
+                    className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all ${
+                      isActive('/jobs') 
+                        ? 'bg-purple-600/5 text-accent' 
+                        : 'text-slate-605 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                   >
-                    <Briefcase className="h-4 w-4 text-purple-600" /> Jobs
+                    <Briefcase className="h-4 w-4 text-purple-500" /> Jobs
                   </Link>
 
-                  {/* Chat Link with Badges */}
                   <Link
                     to="/chat"
-                    className={`flex items-center gap-1.5 text-sm font-medium transition-colors relative ${
-                      isActive('/chat') ? 'text-accent' : 'text-slate-600 hover:text-slate-900'
+                    className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all relative ${
+                      isActive('/chat') 
+                        ? 'bg-purple-600/5 text-accent' 
+                        : 'text-slate-605 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                   >
-                    <MessageSquare className="h-4 w-4 text-purple-600" /> Chat
+                    <MessageSquare className="h-4 w-4 text-purple-500" /> Chat
                     {unreadChatTotal > 0 && (
-                      <span className="absolute -top-1.5 -right-2 bg-accent text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+                      <span className="absolute -top-1 -right-1 bg-accent text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full animate-pulse shadow-md">
                         {unreadChatTotal}
                       </span>
                     )}
                   </Link>
 
-                  {/* Notifications Link with Badges */}
                   <Link
                     to="/notifications"
-                    className={`flex items-center gap-1.5 text-sm font-medium transition-colors relative ${
-                      isActive('/notifications') ? 'text-accent' : 'text-slate-600 hover:text-slate-900'
+                    className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all relative ${
+                      isActive('/notifications') 
+                        ? 'bg-purple-600/5 text-accent' 
+                        : 'text-slate-605 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                   >
-                    <Bell className="h-4 w-4 text-purple-600" /> Notifications
+                    <Bell className="h-4 w-4 text-purple-500" /> Alerts
                     {unreadNotifCount > 0 && (
-                      <span className="absolute -top-1.5 -right-2 bg-red-650 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full animate-pulse shadow-md">
                         {unreadNotifCount}
                       </span>
                     )}
                   </Link>
 
-                  {/* Vault Link */}
                   <Link
                     to="/dashboard"
-                    className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                      isActive('/dashboard') ? 'text-accent' : 'text-slate-600 hover:text-slate-900'
+                    className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all ${
+                      isActive('/dashboard') 
+                        ? 'bg-purple-600/5 text-accent' 
+                        : 'text-slate-605 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                   >
-                    <FolderOpen className="h-4 w-4 text-purple-600" /> Vault
+                    <FolderOpen className="h-4 w-4 text-purple-500" /> Vault
                   </Link>
 
-                  {/* Premium Link */}
                   <Link
                     to="/premium"
-                    className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                      isActive('/premium') ? 'text-amber-550 font-bold' : 'text-slate-600 hover:text-slate-900'
+                    className={`flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-xl transition-all ${
+                      isActive('/premium') 
+                        ? 'bg-amber-500/10 text-amber-600' 
+                        : 'text-amber-500 hover:text-amber-650 hover:bg-amber-500/5'
                     }`}
                   >
-                    <Sparkles className={`h-4 w-4 ${user?.isPremium ? 'text-amber-500 fill-current animate-pulse' : 'text-slate-400'}`} /> Premium
+                    <Sparkles className={`h-4 w-4 ${user?.isPremium ? 'text-amber-500 fill-current animate-pulse' : 'text-amber-400'}`} /> Premium
                   </Link>
 
-                  {/* Profile Link */}
                   <Link
                     to={`/profile/${user._id}`}
-                    className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                      isActive(`/profile/${user._id}`) ? 'text-accent' : 'text-slate-600 hover:text-slate-900'
+                    className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all ${
+                      isActive(`/profile/${user._id}`) 
+                        ? 'bg-purple-600/5 text-accent' 
+                        : 'text-slate-605 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                   >
-                    <User className="h-4 w-4 text-purple-600" /> Profile
+                    <User className="h-4 w-4 text-purple-500" /> Profile
                   </Link>
 
                   <button
                     onClick={handleLogout}
-                    className="flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-750 transition-colors border border-red-200 hover:border-red-300 px-3.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100"
+                    className="flex items-center gap-1.5 text-xs font-semibold text-red-650 hover:text-red-700 transition-all border border-red-200/50 hover:border-red-300 px-3.5 py-1.5 rounded-xl bg-red-500/5"
                   >
                     <LogOut className="h-4 w-4" /> Logout
                   </button>
@@ -281,17 +290,17 @@ export default function Navbar() {
                 <div className="flex items-center gap-4">
                   <Link
                     to="/login"
-                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-950 transition-colors"
                   >
-                    Login
+                    Member Login
                   </Link>
                   <Link
                     to="/register"
-                    className="bg-accent hover:bg-accent-dark text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-md shadow-purple-500/10"
+                    className="bg-gradient-to-r from-accent via-indigo-600 to-indigo-700 hover:opacity-95 text-white text-xs font-bold px-4.5 py-2.5 rounded-xl transition-all shadow-lg shadow-purple-500/15 hover:scale-[1.02] active:scale-[0.98]"
                   >
                     Join Vault
                   </Link>
-                  <span className="text-slate-350">|</span>
+                  <span className="text-slate-200">|</span>
                   <Link
                     to="/admin/login"
                     className="text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors"
@@ -302,7 +311,6 @@ export default function Navbar() {
                 </div>
               )}
             </div>
-
           </div>
         </div>
       </nav>
